@@ -1,4 +1,5 @@
 ### npm install
+
 - npm install react-router-dom: a router tool
 - npm install
 - npm install lucide-react: svg icon library
@@ -20,11 +21,12 @@
 - npx prisma migrate dev --name init_tarot_articles
 - npx prisma migrate reset: 拆舊換新
 - npx nodemon src/server.js: 啟動後端，且nodemon 會自動重新啟動它
-適合開發時持續監看檔案變化
+   適合開發時持續監看檔案變化
 - npm install express cors dotenv prisma @prisma/client bcrypt jsonwebtoken multer
 - npm install axios cheerio: install axios(爬蟲) and analyze HTML label(cheerio)
 
 ### tech stack
+
 - frontend: React.js, Next.js
 - backend: Python(Flask o rFastAPI)->why not use Node.js?+ MongoDB or PostgreSQL
 - 3D engine: Three.js 搭配 React Three Fiber(R3F)
@@ -32,5 +34,5 @@
 - screenshot: html2canvas
 
 ### file
-- main.jsx: project entry point
 
+- main.jsx: project entry point
