@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+// uninstall Prisma7, install Prisma 6
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+enum ThemeColor {
+  MIDNIGHT_PURPLE
+  STAR_GOLD
+  MOONLIGHT_SILVER
+}
+enum ParticleIntensity {
+  LOW
+  MEDIUM
+  HIGH
+}
+model User {
+  id                Int      @id @default(autoincrement())
+  username          String   @unique
+  email             String   @unique
+  phone             String   @unique
+  password          String   // Bcrypt 加密字串
+  avatarUrl         String?  // 大頭貼網址
+  masterCard        String?  // 首次登入抽牌判定
+  bio               String?  @default("探索星辰與命運的記錄者。")
+  themeColor        ThemeColor?  @default(MIDNIGHT_PURPLE)
+  particleIntensity ParticleIntensity?  @default(MEDIUM)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  favorites         Favorite[]
+  history           History[]
+}
+
+enum ArticleTabType {
+  ORIGINS
+  CODEX
+  REPORT
+}
+enum ArticleCategory {
+  MYTHOLOGY
+  HISTORY
+  SOUL
+  DIVINATION
+}
+enum SystemType {
+  TAROT
+  ASTROLOGY
+  BAZI
+  ZIWEI
+}
+
+model Article {
+  id          Int      @id @default(autoincrement())
+
+  systemType  SystemType
+  tabType     ArticleTabType
+  category    ArticleCategory
+
+  title       String   @unique
+  content     String   @db.Text
+  detail      String   @db.Text
+
+  createdAt   DateTime @default(now())
+
+  favorites   Favorite[]
+  @@index([systemType, tabType])
+}
+
+model History {
+  id          Int      @id @default(autoincrement())
+
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  systemType  SystemType
+
+  title       String
+  content     String   @db.Text
+
+  createdAt   DateTime @default(now())
+
+  favorites   Favorite[]
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  articleId  Int?
+  article    Article? @relation(fields: [articleId], references: [id])
+
+  historyId  Int?
+  history    History? @relation(fields: [historyId], references: [id])
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@unique([userId, articleId])
+  @@unique([userId, historyId])
+}

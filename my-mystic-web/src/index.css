@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&family=Noto+Serif+TC:wght@300;400;700&display=swap');
+
+/* 全域字體設定：優先使用英文字體，遇到中文再自動退回使用思源宋體 */
+body {
+  font-family: 'Cinzel', 'Noto Serif TC', serif;
+  background-color: #0d0d0d; /* 更深邃的宇宙黑 */
+  color: #e0e0e0;
+  margin: 0;
+  padding: 0;
+}
+
+/* 針對需要大量閱讀的雙語說明書，可以改用這組比較柔和的字體 */
+.manual-text {
+  font-family: 'Cormorant Garamond', 'Noto Serif TC', serif;
+  line-height: 1.8;
+  letter-spacing: 1.5px;
+}
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: #fff !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+}
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: none;
+}
