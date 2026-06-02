@@ -106,6 +106,8 @@ function CosmicCore({ currentId, color, gestureData }) {
   const geoRef = useRef();
   const persistentScale = useRef(1);
   const shapes = useMemo(() => generateShapes(), []);
+  const livePositions = useMemo(() => new Float32Array(shapes[currentId] || shapes.tarot), []);
+  const velocities = useRef(new Float32Array(PARTICLE_COUNT * 3));
 
   // ===== 滑鼠：平滑跟隨版本（重點升級）=====
   const mouse = useRef(new THREE.Vector3(0, 0, 0));
@@ -144,25 +146,35 @@ function CosmicCore({ currentId, color, gestureData }) {
       const ty = targetPos[i + 1];
 
       // ===== 形狀回彈 =====
-      pos[i] = THREE.MathUtils.lerp(pos[i], tx, 0.08);
-      pos[i + 1] = THREE.MathUtils.lerp(pos[i + 1], ty, 0.08);
-      pos[i + 2] = THREE.MathUtils.lerp(pos[i + 2], targetPos[i + 2], 0.08);
+      const spring = 0.026;
+      const damping = 0.91;
+      const influenceRadius = 3.2;
+      const pullStrength = 0.01;
+      const dentStrength = 0.055;
 
-      // ===== mouse interaction =====
-      const dx = pos[i] - mx;
-      const dy = pos[i + 1] - my;
+      velocities.current[i] += (tx - pos[i]) * spring;
+      velocities.current[i + 1] += (ty - pos[i + 1]) * spring;
+      velocities.current[i + 2] += (targetPos[i + 2] - pos[i + 2]) * spring;
 
+      const dx = mx - pos[i];
+      const dy = my - pos[i + 1];
       const dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
 
-      const influenceRadius = 4;
-      const strength = 0.08;
-
       if (dist < influenceRadius) {
-        const force = 1 - dist / influenceRadius;
+        const force = Math.sin((1 - dist / influenceRadius) * Math.PI * 0.5);
 
-        pos[i] += (dx / dist) * force * strength;
-        pos[i + 1] += (dy / dist) * force * strength;
+        velocities.current[i] += (dx / dist) * force * pullStrength;
+        velocities.current[i + 1] += (dy / dist) * force * pullStrength;
+        velocities.current[i + 2] -= force * dentStrength;
       }
+
+      velocities.current[i] *= damping;
+      velocities.current[i + 1] *= damping;
+      velocities.current[i + 2] *= damping;
+
+      pos[i] += velocities.current[i];
+      pos[i + 1] += velocities.current[i + 1];
+      pos[i + 2] += velocities.current[i + 2];
 
       // ===== color =====
       if (currentId === "bazi") {
@@ -213,7 +225,7 @@ function CosmicCore({ currentId, color, gestureData }) {
         <bufferAttribute
           attach="attributes-position"
           count={PARTICLE_COUNT}
-          array={shapes[currentId]}
+          array={livePositions}
           itemSize={3}
         />
         <bufferAttribute
@@ -246,7 +258,7 @@ function GalaxyBackground() {
   const [positions, colors] = useMemo(() => {
     const pos = new Float32Array(count * 3);
     const cols = new Float32Array(count * 3);
-    
+
     const palette = [
       new THREE.Color('#00ccff'), // 冰藍
       new THREE.Color('#bc13fe'), // 幽冥紫
@@ -327,10 +339,12 @@ export default function MainDashboard() {
 
   const scrollLock = useRef(false);
   const handleWheel = (e) => {
-    if (scrollLock.current) return;
-    if (Math.abs(e.deltaY) < 30) return; // ignore small scrolls
+    e.preventDefault();
 
-    if (e.deltaY > 0) nextRealm(); //deltaY= mouse scroll speed /strength
+    if (scrollLock.current) return;
+    if (Math.abs(e.deltaY) < 30) return;
+
+    if (e.deltaY > 0) nextRealm();
     else prevRealm();
 
     scrollLock.current = true;
@@ -347,9 +361,22 @@ export default function MainDashboard() {
   const [btnHover, setBtnHover] = useState(false);
   const [sensorHover, setSensorHover] = useState(false);
   const [searchHover, setSearchHover] = useState(false);
+  const [profileHover, setProfileHover] = useState(false);
 
   return (
-    <div style={{ height: '100vh', background: '#000', color: '#fff', position: 'relative', overflow: 'hidden' }} onWheel={handleWheel}>
+    <div
+      style={{
+        height: '100vh',
+        width: '100vw',
+        background: '#000',
+        color: '#fff',
+        position: 'fixed',
+        inset: 0,
+        overflow: 'hidden',
+        overscrollBehavior: 'none'
+      }}
+      onWheel={handleWheel}
+    >
 
       {/* Navbar */}
         <nav style={{
@@ -371,7 +398,23 @@ export default function MainDashboard() {
         </div>
 
         {/* right:Profile */}
-        <div onClick={() => navigate('/profile')} style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center',gap: '12px', cursor: 'pointer'}}>
+        <div
+          onClick={() => navigate('/profile')}
+          onMouseEnter={() => setProfileHover(true)}
+          onMouseLeave={() => setProfileHover(false)}
+          style={{
+            width: '200px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            transform: profileHover ? 'scale(1.05)' : 'scale(1)',
+            transformOrigin: 'right center',
+            transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), filter 260ms ease',
+            filter: profileHover ? `drop-shadow(0 0 10px ${currentRealm.color}80)` : 'none'
+          }}
+        >
           <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
             <div style={{ fontSize: '0.65rem', color: currentRealm.color, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
             <div style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}>AGENT JUDY</div>

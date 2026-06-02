@@ -604,7 +604,7 @@ const searchBox = { display: 'flex', alignItems: 'center', gap: '12px', backgrou
 const searchInput = { background: 'none', border: 'none', color: '#fff', outline: 'none', fontSize: '0.85rem', width: '100%' };
 const sidebarList = { display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 };
 const itemTitle = { color: '#888', marginTop: '6px', fontSize: '0.95rem' };
-const itemStyle = { display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderRadius: '4px', cursor: 'pointer', transition: '0.3s', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+const itemStyle = { display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderRadius: '4px', cursor: 'pointer', transition: '0.3s', border: '1px solid transparent' };
 const itemContent = { flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' };
 
 
