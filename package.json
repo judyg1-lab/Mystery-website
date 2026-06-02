@@ -1,0 +1,12 @@
+{
+    "name": "mystery",
+    "private": true,
+    "scripts": {
+    "dev": "chcp 65001 && concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "chcp 65001 && npm --prefix backend run dev",
+    "dev:frontend": "chcp 65001 && npm --prefix frontend run dev"
+    },
+    "devDependencies": {
+        "concurrently": "^10.0.1"
+    }
+}

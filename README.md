@@ -24,9 +24,9 @@
    適合開發時持續監看檔案變化
 - npm install express cors dotenv prisma @prisma/client bcrypt jsonwebtoken multer
 - npm install axios cheerio: install axios(爬蟲) and analyze HTML label(cheerio)
+- npm install -D concurrently: 它記錄到 devDependencies，讓你可以用一個指令同時執行多個程式
 
 ### tech stack
-
 - frontend: React.js, Next.js
 - backend: Python(Flask o rFastAPI)->why not use Node.js?+ MongoDB or PostgreSQL
 - 3D engine: Three.js 搭配 React Three Fiber(R3F)
