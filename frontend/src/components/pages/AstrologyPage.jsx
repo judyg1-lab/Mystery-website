@@ -352,10 +352,20 @@ export default function AstrologyPage() {
             </button>
           ))}
         </div>
-        <div onClick={() => navigate('/profile')} style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+        <div onClick={() => navigate('/profile')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.filter = 'drop-shadow(0 0 10px rgba(188,19,254,0.5))';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.filter = 'none';
+            }}
+            style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+        >
           <div style={{ textAlign: 'right', lineHeight: '1.2', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ fontSize: '0.85rem', color: '#50fa7b', letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
-            <div style={{ fontSize: '0.85rem', color: '#666', letterSpacing: '1px' }}>{username}</div>
+            <div style={{ fontSize: '0.75rem', color: '#50fa7b', letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
+            <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '1px', fontWeight: 'bold' }}>{username}</div>
           </div>
           <ProfileIcon color={'#50fa7b'} />
         </div>

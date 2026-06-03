@@ -344,10 +344,32 @@ export default function TarotPage() {
               {activeTab === tab && <motion.div layoutId="navLine" style={activeUnderline} />}
             </button>
           ))}</div>
-        <div onClick={() => navigate('/profile')} style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center',gap: '12px', cursor: 'pointer'}}>
+        <div
+          onClick={() => navigate('/profile')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.filter = 'drop-shadow(0 0 10px rgba(188,19,254,0.5))';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.filter = 'none';
+          }}
+          style={{
+            width: '200px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            transform: 'scale(1)',
+            transformOrigin: 'right center',
+            transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), filter 260ms ease',
+            filter: 'none'
+          }}
+        >
           <div style={{ textAlign: 'right', lineHeight: '1.2', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ fontSize: '0.85rem', color: '#bc13fe', letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
-            <div style={{ fontSize: '0.85rem', color: '#666', letterSpacing: '1px' }}>{username}</div>
+            <div style={{ fontSize: '0.75rem', color: '#bc13fe', letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
+            <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '1px' }}>{username}</div>
           </div>
           <ProfileIcon color={'#bc13fe'} />
         </div>
@@ -370,11 +392,16 @@ export default function TarotPage() {
                       onMouseEnter={(e)=>{
                         if(selectedItem?.id !== item.id){
                           e.currentTarget.style.background ='rgba(188,19,254,0.08)';
-                          e.currentTarget.style.border ='1px solid rgba(188,19,254,0.2)';}}}
+                          e.currentTarget.style.border ='1px solid rgba(188,19,254,0.2)';
+                          e.currentTarget.style.boxShadow = '0 0 8px rgba(188,19,254,0.08)';}
+                        }}
                       onMouseLeave={(e)=>{
                         if(selectedItem?.id !== item.id){
                           e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.border ='1px solid transparent';}}}>
+                          e.currentTarget.style.border ='1px solid transparent';
+                          e.currentTarget.style.boxShadow = 'none';}
+                        }}
+                  >
                     <div style={{ flex: 1, cursor: 'pointer' }}>
                         <div style={itemContent}>
                           <span style={catTag}>{item.category}</span>
@@ -573,7 +600,7 @@ const searchBox = { display: 'flex', alignItems: 'center', gap: '12px', backgrou
 const searchInput = { background: 'none', border: 'none', color: '#fff', outline: 'none', fontSize: '0.85rem', width: '100%' };
 const sidebarList = { display: 'flex', flexDirection: 'column', overflowY: 'auto',flex: 1,  minHeight: 0};
 const itemTitle = { color: '#888', marginTop: '6px', fontSize: '0.95rem' };
-const itemStyle = { display: 'flex',gap: '12px', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderRadius: '4px', cursor: 'pointer', transition: '0.3s',border: '1px solid transparent'};
+const itemStyle = { display: 'flex',gap: '12px', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderRadius: '4px', cursor: 'pointer', transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',border: '1px solid transparent',background: 'transparent',boxShadow: 'none' };
 const itemContent = {flex: 1,display: 'flex',flexDirection: 'column',gap: '6px'};
 const activeItem = { ...itemStyle, background: 'rgba(90, 20, 120, 0.18)', border: '1px solid rgba(188,19,254,0.18)', boxShadow: `
     inset 0 0 12px rgba(188,19,254,0.08),0 0 8px rgba(188,19,254,0.08)`,transition: '0.3s' };

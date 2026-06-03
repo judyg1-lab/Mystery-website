@@ -333,10 +333,11 @@ export default function BaZiPage() {
             </button>
           ))}
         </div>
-        <div onClick={() => navigate('/profile')} style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+        <div onClick={() => navigate('/profile')}
+            style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
           <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
-            <div style={{ fontSize: '0.65rem', color: ACCENT, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
-            <div style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}>{username}</div>
+            <div style={{ fontSize: '0.75rem', color: ACCENT, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
+            <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '1px', fontWeight: 'bold' }}>{username}</div>
           </div>
           <ProfileIcon color={ACCENT} />
         </div>

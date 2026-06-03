@@ -323,7 +323,7 @@ function GalaxyBackground() {
     </points>
   );
 }
-// ================= 主畫面 =================
+
 export default function MainDashboard() {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0); //control which realm is active
@@ -361,7 +361,20 @@ export default function MainDashboard() {
   const [btnHover, setBtnHover] = useState(false);
   const [sensorHover, setSensorHover] = useState(false);
   const [searchHover, setSearchHover] = useState(false);
-  const [profileHover, setProfileHover] = useState(false);
+
+  const [username, setUsername] = useState('AGENT GUEST');
+  useEffect(() => {
+      const savedUser = localStorage.getItem('user_info');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed.username) setUsername(parsed.username);
+        } catch (err) {
+          console.error('解析使用者資訊失敗:', err);
+        }
+      }
+    }, []);
+
 
   return (
     <div
@@ -400,8 +413,14 @@ export default function MainDashboard() {
         {/* right:Profile */}
         <div
           onClick={() => navigate('/profile')}
-          onMouseEnter={() => setProfileHover(true)}
-          onMouseLeave={() => setProfileHover(false)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.filter = `drop-shadow(0 0 10px ${currentRealm.color}80)`; // color+alpha for glow
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.filter = 'none';
+          }}
           style={{
             width: '200px',
             display: 'flex',
@@ -409,15 +428,15 @@ export default function MainDashboard() {
             alignItems: 'center',
             gap: '12px',
             cursor: 'pointer',
-            transform: profileHover ? 'scale(1.05)' : 'scale(1)',
+            transform: 'scale(1)',
             transformOrigin: 'right center',
             transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), filter 260ms ease',
-            filter: profileHover ? `drop-shadow(0 0 10px ${currentRealm.color}80)` : 'none'
+            filter: 'none'
           }}
         >
           <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
-            <div style={{ fontSize: '0.65rem', color: currentRealm.color, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
-            <div style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '1px' }}>AGENT JUDY</div>
+            <div style={{ fontSize: '0.75rem', color: currentRealm.color, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
+            <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '1px', fontWeight: 'bold' }}>AGENT {username}</div>
           </div>
           <ProfileIcon color={currentRealm.color} />
         </div>
