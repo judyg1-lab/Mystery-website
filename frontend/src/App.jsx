@@ -20,6 +20,7 @@ function App() {
 
         <Route path="/maindashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
         <Route path="/tarot" element={<ProtectedRoute><TarotPage /></ProtectedRoute>} />
+        <Route path="/tarot/drawing" element={<ProtectedRoute><TarotPage /></ProtectedRoute>} />
         <Route path="/bazi" element={<ProtectedRoute><BaZiPage /></ProtectedRoute>} />
         <Route path="/ziwei" element={<ProtectedRoute><ZiWeiPage /></ProtectedRoute>} />
         <Route path="/astrology" element={<ProtectedRoute><AstrologyPage /></ProtectedRoute>} />
