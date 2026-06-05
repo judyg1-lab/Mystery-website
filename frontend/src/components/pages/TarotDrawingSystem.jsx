@@ -372,7 +372,14 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
             </div>
             <div className="spread-selection-stage" style={spreadCarouselStage}>
               <img className="spread-magic-floor" src="/assets/tarot/magic-circle-floor.png" alt="" style={spreadMagicCircleFloor} />
-              <motion.button type="button" style={{ ...carouselArrow, left: 'calc(50% - 218px)' }} whileHover={buttonHover} whileTap={{ scale: 0.94 }} onClick={handlePrevSpread}>
+              <motion.button
+                type="button"
+                aria-label="Previous spread"
+                style={{ ...carouselArrow, left: 'calc(50% - 218px)' }}
+                whileHover={carouselArrowHover}
+                whileTap={carouselArrowTap}
+                onClick={handlePrevSpread}
+              >
                 {'<'}
               </motion.button>
               <motion.div
@@ -431,11 +438,17 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
                 );
               })}
               </motion.div>
-              <motion.button type="button" style={{ ...carouselArrow, right: 'calc(50% - 218px)' }} whileHover={buttonHover} whileTap={{ scale: 0.94 }} onClick={handleNextSpread}>
+              <motion.button
+                type="button"
+                aria-label="Next spread"
+                style={{ ...carouselArrow, right: 'calc(50% - 218px)' }}
+                whileHover={carouselArrowHover}
+                whileTap={carouselArrowTap}
+                onClick={handleNextSpread}
+              >
                 {'>'}
               </motion.button>
             </div>
-            <FloatingGuideBook onClick={() => setShowQuestionGuide(true)} />
             <AnimatePresence>
               {showQuestionGuide && <QuestionGuideBook onClose={() => setShowQuestionGuide(false)} />}
             </AnimatePresence>
@@ -464,9 +477,11 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
                 START SHUFFLE
               </motion.button>
             </div>
-            <DeckStack cardBackUrl={cardBackUrl} />
-            <div style={questionPortalStage} />
-            <FloatingGuideBook onClick={() => setShowQuestionGuide(true)} />
+            <div style={questionDeckColumn}>
+              <DeckStack cardBackUrl={cardBackUrl} />
+              <FloatingGuideBook onClick={() => setShowQuestionGuide(true)} style={questionGuideBookButton} />
+            </div>
+            <img src="/assets/tarot/magic-circle-floor.png" alt="" style={questionMagicCircleFloor} />
           </motion.div>
         )}
 
@@ -649,12 +664,12 @@ function QuestionGuideBook({ onClose }) {
   );
 }
 
-function FloatingGuideBook({ onClick }) {
+function FloatingGuideBook({ onClick, style }) {
   return (
     <motion.button
       type="button"
       aria-label="Open question guide"
-      style={floatingGuideBook}
+      style={{ ...floatingGuideBook, ...style }}
       whileHover={{ y: -4, scale: 1.05, filter: 'drop-shadow(0 0 18px rgba(188,19,254,0.55)) brightness(1.12)' }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
@@ -754,12 +769,12 @@ function ResultCard({ card, cardBackUrl, style }) {
 
 const spreadFrameImage = {
   position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
+  top:'-14%',
+  width: '130%',
+  height: '130%',
   objectFit: 'fill',
   pointerEvents: 'none',
-  opacity: 0.68,
+  opacity: 0.45,
   zIndex: 4
 };
 
@@ -771,6 +786,19 @@ const fadeMotion = {
 
 const zhFont = "'Noto Serif TC', 'Microsoft JhengHei', 'PingFang TC', sans-serif";
 const buttonHover = { filter: 'brightness(1.12) drop-shadow(0 0 16px rgba(188,19,254,0.46))', color: '#ffffff' };
+const carouselArrowHover = {
+  color: '#ffffff',
+  borderColor: 'rgba(241,216,143,0.58)',
+  background: 'linear-gradient(180deg, rgba(30,15,42,0.72), rgba(7,3,12,0.86))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -8px 16px rgba(0,0,0,0.32), 0 0 16px rgba(212,175,55,0.24), 0 0 22px rgba(188,19,254,0.18)',
+  filter: 'brightness(1.12)'
+};
+const carouselArrowTap = {
+  scale: 0.9,
+  background: 'linear-gradient(180deg, rgba(7,3,12,0.9), rgba(28,12,40,0.72))',
+  boxShadow: 'inset 0 6px 14px rgba(0,0,0,0.52), 0 0 8px rgba(212,175,55,0.16)',
+  filter: 'brightness(0.96)'
+};
 const spreadHover = {
   y: -4,
   filter: 'brightness(1.08) drop-shadow(0 0 12px rgba(188,19,254,0.24))',
@@ -824,7 +852,7 @@ const resultCardFace = (cardBackUrl) => ({
 const systemShell = {
   position: 'relative',
   width: '100%',
-  height: 'calc(100vh - 120px)',
+  height: 'calc(100vh - 80px)',
   minHeight: '620px',
   display: 'flex',
   alignItems: 'center',
@@ -848,11 +876,12 @@ const spreadHeader = {
   position: 'relative',
   zIndex: 6,
   textAlign: 'center',
-  marginTop: 0
+  marginTop: '-38px',
+  marginBottom: '8px',
 };
 const spreadTitle = {
-  marginBottom: '8px',
-  fontSize: 'clamp(1.65rem, 2.65vw, 2.8rem)',
+  marginBottom: '6px',
+  fontSize: 'clamp(1.48rem, 2.35vw, 2.45rem)',
   lineHeight: 1,
   letterSpacing: '0.12em',
   textShadow: '0 0 18px rgba(255,255,255,0.16)'
@@ -864,10 +893,10 @@ const spreadSubtitle = {
   gap: '16px',
   color: 'rgba(255,255,255,0.62)',
   fontFamily: zhFont,
-  fontSize: '0.9rem',
-  lineHeight: 1.4,
+  fontSize: '0.82rem',
+  lineHeight: 1.32,
   letterSpacing: '0.08em',
-  marginTop: '2px'
+  marginTop: 0
 };
 const spreadSubtitleLine = {
   height: '1px',
@@ -878,7 +907,6 @@ const spreadPanel = {
   zIndex: 2,
   width: 'min(1180px, 96vw)',
   minHeight: '560px',
-  padding: '42px 20px 34px',
   overflow: 'visible',
   textAlign: 'center',
   isolation: 'isolate'
@@ -894,6 +922,37 @@ const questionLayout = {
     width: 'min(920px, 92vw)'
 };
 const questionPanel = { ...panel, width: '100%', boxSizing: 'border-box' };
+const questionDeckColumn = {
+  position: 'relative',
+  zIndex: 3,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '18px'
+};
+const questionGuideBookButton = {
+  position: 'relative',
+  right: 'auto',
+  bottom: 'auto',
+  width: '82px',
+  height: '82px'
+};
+const questionMagicCircleFloor = {
+  position: 'absolute',
+  left: '50%',
+  bottom: '-116px',
+  width: 'min(1280px, 118vw)',
+  height: '320px',
+  maxWidth: 'none',
+  transform: 'translateX(-50%)',
+  objectFit: 'contain',
+  objectPosition: 'center bottom',
+  opacity: 0.58,
+  filter: 'brightness(0.9) saturate(0.92)',
+  pointerEvents: 'none',
+  userSelect: 'none',
+  zIndex: 0
+};
 const questionPortalStage = {
   position: 'absolute',
   left: '50%',
@@ -935,21 +994,21 @@ const spreadCarouselStage = {
   alignItems: 'center',
   justifyContent: 'center',
   perspective: '1200px',
-  marginTop: '14px',
+  marginTop: '5px',
   overflow: 'visible'
 };
 const spreadMagicCircleFloor = {
   position: 'absolute',
   left: '50%',
-  bottom: '-132px',
+  bottom: '-58px',
   width: 'min(1536px, 120vw)',
-  height: '320px',
+  height: '300px',
   maxWidth: 'none',
   transform: 'translateX(-50%)',
   objectFit: 'contain',
   objectPosition: 'center bottom',
-  opacity: 0.68,
-  filter: 'brightness(1.05) saturate(0.96)',
+  opacity: 0.85,
+  filter: 'brightness(0.85) saturate(0.96)',
   pointerEvents: 'none',
   userSelect: 'none',
   zIndex: 0
@@ -964,17 +1023,18 @@ const spreadCarousel = {
 };
 const spreadCarouselCard = {
   position: 'absolute',
-  inset: 0,
+  top: '-6.5%',
+  left:'-0.5%',
   display: 'grid',
   gridTemplateRows: 'auto minmax(116px, 1fr) auto auto',
   justifyItems: 'center',
-  rowGap: '6px',
+  rowGap: '12px',
   alignItems: 'center',
   background: 'transparent',
   border: 'none',
-  borderRadius: 0,
+  borderRadius: 22,
   color: '#fff',
-  minHeight: '386px',
+  minHeight: '350px',
   padding: 0,
   textAlign: 'center',
   fontFamily: zhFont,
@@ -982,7 +1042,9 @@ const spreadCarouselCard = {
   overflow: 'visible',
   transformStyle: 'preserve-3d',
   boxSizing: 'border-box',
-  cursor: 'pointer'
+  cursor: 'pointer',
+  backdropFilter: 'blur(2px)',
+  zIndex:2
 };
 const activeSpreadDisplayCard = {
   boxShadow: '0 0 0 1px rgba(212,175,55,0.36), 0 0 24px rgba(188,19,254,0.24)'
@@ -995,10 +1057,10 @@ const spreadActiveUplight = {
   left: '50%',
   bottom: '-26px',
   width: '68%',
-  height: '116px',
+  height: '120px',
   transform: 'translateX(-50%)',
   background: 'linear-gradient(to top, rgba(188,19,254,0.28), rgba(212,175,55,0.12) 42%, transparent 80%)',
-  filter: 'blur(14px)',
+  filter: 'blur(15px)',
   pointerEvents: 'none',
   zIndex: 0
 };
@@ -1017,8 +1079,8 @@ const spreadIconCenterGlow = {
   position: 'absolute',
   left: '50%',
   top: '50%',
-  width: '94px',
-  height: '94px',
+  width: '95px',
+  height: '95px',
   transform: 'translate(-50%, -50%)',
   borderRadius: '50%',
   background: 'radial-gradient(circle, rgba(255,255,255,0.18), rgba(212,175,55,0.16) 18%, rgba(188,19,254,0.18) 42%, transparent 68%)',
@@ -1028,20 +1090,26 @@ const spreadIconCenterGlow = {
 };
 const carouselArrow = {
   position: 'absolute',
-  top: '50%',
+  top: 'calc(45% - 30px)',
   zIndex: 8,
-  width: '40px',
-  height: '40px',
-  transform: 'translateY(-50%)',
+  width: '42px',
+  height: '42px',
   borderRadius: '50%',
-  border: '1px solid rgba(212,175,55,0.36)',
-  background: 'rgba(8,4,13,0.72)',
-  color: '#d4af37',
-  fontSize: '1.7rem',
+  border: '1px solid rgba(212,175,55,0.28)',
+  background: 'linear-gradient(180deg, rgba(15,7,22,0.64), rgba(3,1,8,0.78))',
+  color: 'rgba(212,175,55,0.82)',
+  fontSize: '1.65rem',
   lineHeight: 1,
   cursor: 'pointer',
   display: 'grid',
-  placeItems: 'center'
+  placeItems: 'center',
+  padding: 0,
+  outline: 'none',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
+  textShadow: '0 0 10px rgba(212,175,55,0.24)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -7px 14px rgba(0,0,0,0.28), 0 0 10px rgba(212,175,55,0.1)',
+  transition: 'color 160ms ease, filter 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease'
 };
 const spreadActiveAura = {
   display: 'none'
@@ -1085,15 +1153,15 @@ const spreadTextBlock = {
   alignItems: 'center',
   justifyContent: 'center',
   width: '74%',
-  marginTop: '48px',
+  marginTop: '25px',
   minHeight: '52px',
   zIndex: 5
 };
 const spreadNameText = {
   color: '#ffffff',
   fontFamily: "'Cinzel', serif",
-  fontSize: '0.86rem',
-  lineHeight: 1.2,
+  fontSize: '1rem',
+  lineHeight: 1.3,
   letterSpacing: 0,
   whiteSpace: 'nowrap',
   textShadow: '0 0 12px rgba(255,255,255,0.2)'
@@ -1101,10 +1169,10 @@ const spreadNameText = {
 const spreadZhText = {
   color: '#d4af37',
   fontFamily: zhFont,
-  fontSize: '0.88rem',
+  fontSize: '0.9rem',
   lineHeight: 1.25,
   fontStyle: 'normal',
-  letterSpacing: '0.08em'
+  letterSpacing: '0.15em'
 };
 const spreadDescBlock = {
   width: '72%',
@@ -1113,7 +1181,7 @@ const spreadDescBlock = {
   alignItems: 'center',
   justifyContent: 'center',
   color: 'rgba(255,255,255,0.82)',
-  fontSize: '0.78rem',
+  fontSize: '0.85rem',
   lineHeight: 1.62,
   letterSpacing: '0.03em',
   wordBreak: 'break-word',
@@ -1129,7 +1197,7 @@ const spreadCountPill = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '4px',
+  gap: '2px',
   color: '#f1d88f',
   background: 'rgba(3,1,8,0.76)',
   fontWeight: 500,
@@ -1142,10 +1210,11 @@ const spreadAside = {
   alignItems: 'center',
   gap: '7px',
   paddingTop: '2px',
+  marginBottom: '14px',
   borderTop: '1px solid rgba(212,175,55,0.16)',
   color: 'rgba(255,255,255,0.64)',
   fontSize: '0.76rem',
-  lineHeight: 1.55,
+  lineHeight: 1.5,
   zIndex: 5
 };
 const selectSpreadButton = {
@@ -1419,8 +1488,8 @@ const bookCloseButton = {
 };
 
 const spreadImageWrap = {
-  width: '138px',
-  height: '112px',
+  width: '250px',
+  height: '140px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1433,7 +1502,7 @@ const spreadImage = {
   maxWidth: '100%',
   maxHeight: '100%',
   objectFit: 'contain',
-  filter: 'drop-shadow(0 0 18px rgba(188,19,254,0.45))',
+  filter: 'drop-shadow(0 0 25px rgba(188,19,254,0.5))',
   pointerEvents: 'none'
 };
 
@@ -1486,9 +1555,9 @@ const drawSystemCSS = `
 
     .spread-magic-floor {
       width: 150vw !important;
-      height: 260px !important;
-      bottom: -86px !important;
-      opacity: 0.26 !important;
+      height: 290px !important;
+      bottom: -52px !important;
+      opacity: 0.42 !important;
     }
 
     .spread-selection-grid {

@@ -419,7 +419,6 @@ export default function TarotPage() {
         type={modalConfig.type}
       />
 
-      {/* ?撠汗 */}
       <nav style={topNavBar}>
         <div style={{ display:'flex', alignItems:'center',gap:'25px'}}>
             <BackBtn onClick={() => navigate(-1)} />
