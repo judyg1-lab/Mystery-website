@@ -1,12 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Compass, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import TarotDrawStage from './TarotDrawStage';
 
 const text = (value) => decodeURIComponent(value);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const DECK_SIZE = 78;
-const FAN_CARD_COUNT = 55;
+const QUESTION_FOCUS_RAYS = [
+  { left: '50%', bottom: '-138px', height: '250px', transform: 'translateX(-50%) rotate(0deg)', opacity: 0.82 },
+  { left: '50%', bottom: '-130px', height: '224px', transform: 'translateX(-50%) rotate(-7deg)', opacity: 0.46 },
+  { left: '50%', bottom: '-130px', height: '224px', transform: 'translateX(-50%) rotate(7deg)', opacity: 0.46 },
+  { left: '50%', bottom: '-124px', height: '192px', transform: 'translateX(-50%) rotate(-14deg)', opacity: 0.28 },
+  { left: '50%', bottom: '-124px', height: '192px', transform: 'translateX(-50%) rotate(14deg)', opacity: 0.28 }
+];
 
 const COPY = {
   checkingMaster: text('%E6%AD%A3%E5%9C%A8%E7%A2%BA%E8%AA%8D%E4%BD%A0%E7%9A%84%E9%9D%88%E9%AD%82%E4%B8%BB%E7%89%8C%E7%B4%80%E9%8C%84%E3%80%82'),
@@ -18,7 +25,9 @@ const COPY = {
   cardUnit: text('%E5%BC%B5'),
   guideTitle: text('%E6%8A%BD%E7%89%8C%E5%89%8D%E7%9A%84%E8%AA%A6%E5%BF%B5'),
   guideBody: text('%E3%80%8C%E8%A6%AA%E6%84%9B%E7%9A%84%E5%A1%94%E7%BE%85%E7%89%8C%E5%A4%A7%E4%BA%BA%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%88%91%E6%98%AFXXX%EF%BC%8C%E8%A5%BF%E5%85%83X%E5%B9%B4X%E6%9C%88X%E6%97%A5%E7%94%9F%EF%BC%8C%E6%88%91%E6%83%B3%E5%95%8F%E7%9A%84%E5%95%8F%E9%A1%8C%E6%98%AF.....%EF%BC%8C%E8%AC%9D%E8%AC%9D%E3%80%82%E3%80%8D'),
-  guideNote: text('%E8%AB%8B%E5%9C%A8%E5%BF%83%E8%A3%A1%E9%87%8D%E8%A4%87%E5%BF%B5%E4%B8%89%E9%81%8D%EF%BC%8C%E5%86%8D%E9%97%9C%E4%B8%8A%E9%80%99%E6%9C%AC%E6%9B%B8%E9%96%8B%E5%A7%8B%E8%BC%B8%E5%85%A5%E5%95%8F%E9%A1%8C%E3%80%82'),
+  guideNote: text('%E8%AB%8B%E5%9C%A8%E5%BF%83%E8%A3%A1%E9%87%8D%E8%A4%87%E5%BF%B5%E4%B8%89%E9%81%8D%EF%BC%8C%E5%86%8D%E9%97%94%E4%B8%8A%E9%80%99%E6%9C%AC%E6%9B%B8%E9%96%8B%E5%A7%8B%E8%BC%B8%E5%85%A5%E5%95%8F%E9%A1%8C%E3%80%82'),
+  guideInstruction: text('%E5%9C%A8%E9%80%B2%E8%A1%8C%E5%8D%A0%E5%8D%9C%E5%89%8D%EF%BC%8C%E8%AB%8B%E5%85%88%E9%9D%9C%E4%B8%8B%E5%BF%83%E4%BE%86%EF%BC%8C%E5%B0%88%E6%B3%A8%E6%96%BC%E4%BD%A0%E7%9A%84%E5%95%8F%E9%A1%8C%EF%BC%8C%E4%B8%A6%E4%BB%A5%E7%9C%9F%E8%AA%A0%E8%88%87%E5%B0%8A%E9%87%8D%E7%9A%84%E5%BF%83%E5%90%91%E5%A1%94%E7%BE%85%E7%89%8C%E6%8F%90%E5%87%BA%E4%BD%A0%E7%9A%84%E8%AB%8B%E6%B1%82%E3%80%82%E8%AE%93%E8%83%BD%E9%87%8F%E8%88%87%E6%84%8F%E5%9C%96%E6%B8%85%E6%99%B0%EF%BC%8C%E6%8C%87%E5%BC%95%E5%B0%87%E6%9B%B4%E5%8A%A0%E6%BA%96%E7%A2%BA%E3%80%82'),
+  openRite: text('%E9%96%8B%E5%95%9F%E5%8D%A0%E5%8D%9C%E5%84%80%E5%BC%8F'),
   closeBook: text('%E9%97%9C%E4%B8%8A%E6%9B%B8%E9%A0%81')
 };
 
@@ -216,7 +225,7 @@ export function TarotPortalParticles({ active = false }) {
   return <canvas ref={canvasRef} style={portalCanvas} />;
 }
 
-export default function TarotDrawingSystem({ cardBackUrl }) {
+export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange }) {
   const [step, setStep] = useState('checking_master');
   const [soulMaster, setSoulMaster] = useState('');
   const [spread, setSpread] = useState(SPREADS[0]);
@@ -227,6 +236,7 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
   const [shuffleTick, setShuffleTick] = useState(0);
   const [tarotCards, setTarotCards] = useState([]);
   const [showQuestionGuide, setShowQuestionGuide] = useState(false);
+  const [isQuestionFocused, setIsQuestionFocused] = useState(false);
   const [activeSpreadIndex, setActiveSpreadIndex] = useState(1);
   const shuffleLayout = useMemo(() => createShuffleLayout(), []);
   const drawableCards = useMemo(() => {
@@ -332,6 +342,29 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
   const handleNextSpread = () => {
     setActiveSpreadIndex((index) => (index + 1) % SPREADS.length);
   };
+
+  const handleDrawingBack = useCallback(() => {
+    if (showQuestionGuide) {
+      setShowQuestionGuide(false);
+      return true;
+    }
+
+    if (['question', 'shuffle', 'draw_cards', 'result'].includes(step)) {
+      setIsQuestionFocused(false);
+      setShowQuestionGuide(false);
+      setStep('select_spread');
+      return true;
+    }
+
+    return false;
+  }, [showQuestionGuide, step]);
+
+  useEffect(() => {
+    if (!onBackHandlerChange) return undefined;
+    onBackHandlerChange(() => handleDrawingBack);
+
+    return () => onBackHandlerChange(null);
+  }, [handleDrawingBack, onBackHandlerChange]);
 
   return (
     <section style={systemShell}>
@@ -450,26 +483,36 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
               </motion.button>
             </div>
             <AnimatePresence>
-              {showQuestionGuide && <QuestionGuideBook onClose={() => setShowQuestionGuide(false)} />}
+              {showQuestionGuide && <QuestionGuideBookModal onClose={() => setShowQuestionGuide(false)} />}
             </AnimatePresence>
           </motion.div>
         )}
 
         {step === 'question' && (
-          <motion.div key="question" {...fadeMotion} style={questionLayout}>
+          <motion.div key="question" {...fadeMotion} className="question-rite-layout" style={questionLayout}>
             <AnimatePresence>
               {showQuestionGuide && (
-                <QuestionGuideBook onClose={() => setShowQuestionGuide(false)} />
+                <QuestionGuideBookModal onClose={() => setShowQuestionGuide(false)} />
               )}
             </AnimatePresence>
-            <div style={questionPanel}>
+            <div className="question-balance-column" style={questionBalanceColumn} aria-hidden="true" />
+            <div className="question-rite-panel" style={{ ...questionPanel, ...(isQuestionFocused ? questionPanelFocused : null) }}>
+              <span style={{ ...questionPanelFocusBeam, opacity: isQuestionFocused ? 1 : 0 }} />
+              {QUESTION_FOCUS_RAYS.map(({ opacity, ...rayStyle }, index) => (
+                <span
+                  key={`question-focus-ray-${index}`}
+                  style={{ ...questionFocusRay, ...rayStyle, opacity: isQuestionFocused ? opacity : 0 }}
+                />
+              ))}
               <div style={goldLabel}>{spread.name}</div>
               <h2 style={title}>Enter Your Question</h2>
               <textarea
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                onFocus={() => setIsQuestionFocused(true)}
+                onBlur={() => setIsQuestionFocused(false)}
                 placeholder={COPY.questionPlaceholder}
-                style={questionInput}
+                style={{ ...questionInput, ...(isQuestionFocused ? questionInputFocused : null) }}
                 disabled={showQuestionGuide}
               />
               <motion.button whileHover={buttonHover} whileTap={{ scale: 0.97 }} onClick={startShuffle} style={primaryButton}>
@@ -477,7 +520,7 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
                 START SHUFFLE
               </motion.button>
             </div>
-            <div style={questionDeckColumn}>
+            <div className="question-deck-column" style={questionDeckColumn}>
               <DeckStack cardBackUrl={cardBackUrl} />
               <FloatingGuideBook onClick={() => setShowQuestionGuide(true)} style={questionGuideBookButton} />
             </div>
@@ -526,55 +569,15 @@ export default function TarotDrawingSystem({ cardBackUrl }) {
         )}
 
         {step === 'draw_cards' && (
-          <motion.div key="draw" {...fadeMotion} style={drawStage}>
-            <ReadingContext soulMaster={soulMaster} spread={spread} cardBackUrl={cardBackUrl} />
-            <div style={drawHeader}>
-              <div style={goldLabel}>DRAW {selectedDraws.length} / {spread.count}</div>
-              <h2 style={title}>Pull One Card At A Time</h2>
-            </div>
-            <div style={fanDeck}>
-              {Array.from({ length: FAN_CARD_COUNT }, (_, index) => {
-                const center = (FAN_CARD_COUNT - 1) / 2;
-                const angle = (index - center) * 2.95;
-                const arcLift = Math.abs(index - center) * 5.1;
-                const picked = selectedDraws.some((card) => card.sourceIndex === index);
-
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      ...fanSlot,
-                      transform: `rotate(${angle}deg) translateY(${-285 + arcLift}px)`
-                    }}
-                  >
-                    <motion.button
-                      type="button"
-                      aria-label={`Pick card ${index + 1}`}
-                      drag={!picked && !isCompleting}
-                      disabled={picked || isCompleting}
-                      dragConstraints={{ top: -130, bottom: 22, left: -90, right: 90 }}
-                      dragElastic={0.22}
-                      whileHover={picked ? undefined : drawCardHover}
-                      whileDrag={drawCardDrag}
-                      whileTap={{ scale: 0.98 }}
-                      transition={{ duration: 0.12 }}
-                      onDragEnd={(_, info) => {
-                        if (Math.abs(info.offset.y) > 44 || Math.abs(info.offset.x) > 54) drawOneCard(index);
-                      }}
-                      onClick={() => drawOneCard(index)}
-                      style={{
-                        ...fanCardBack(cardBackUrl),
-                        opacity: picked ? 0.12 : 1,
-                        cursor: picked ? 'default' : 'grab',
-                        pointerEvents: picked ? 'none' : 'auto'
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <DrawnTray selectedDraws={selectedDraws} cardBackUrl={cardBackUrl} />
-          </motion.div>
+          <TarotDrawStage
+            key="draw"
+            cardBackUrl={cardBackUrl}
+            soulMaster={soulMaster}
+            spread={spread}
+            selectedDraws={selectedDraws}
+            isCompleting={isCompleting}
+            onDrawCard={drawOneCard}
+          />
         )}
 
         {step === 'result' && (
@@ -609,6 +612,56 @@ function DeckStack({ cardBackUrl }) {
       ))}
       <div style={stackLabel}>78</div>
     </div>
+  );
+}
+
+function QuestionGuideBookModal({ onClose }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={bookOverlay}
+    >
+      <motion.div
+        initial={{ rotateX: -10, scale: 0.94, y: 20 }}
+        animate={{ rotateX: 0, scale: 1, y: 0 }}
+        exit={{ rotateX: 8, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+        style={openBook}
+      >
+        <motion.button
+          type="button"
+          aria-label="Close guide"
+          onClick={onClose}
+          style={bookCloseX}
+          whileHover={{ scale: 1.08, filter: 'drop-shadow(0 0 10px rgba(188,19,254,0.55))' }}
+          whileTap={{ scale: 0.94 }}
+        >
+          &times;
+        </motion.button>
+
+        <section style={bookLeftContent}>
+          <div style={bookEyebrow}>QUESTION RITE</div>
+          <h3 style={bookTitle}>{text('%E5%84%80%E5%BC%8F%E7%A5%88%E8%AB%8B')}</h3>
+          <div style={bookSubtitle}>INVOCATION</div>
+          <p style={bookInvocation}>{COPY.guideBody}</p>
+          <div style={bookDivider} />
+          <p style={bookInstruction}>{COPY.guideInstruction}</p>
+        </section>
+
+        <section style={bookRightContent}>
+          <p style={bookNote}>{COPY.guideNote}</p>
+          <div style={bookSeal} aria-hidden="true">
+            <div style={bookSealEye}>◉</div>
+          </div>
+          <motion.button type="button" onClick={onClose} style={bookCloseButton} whileHover={bookButtonHover} whileTap={{ scale: 0.97 }}>
+            <span>{COPY.openRite}</span>
+            <small>PROCEED TO DIVINATION</small>
+          </motion.button>
+        </section>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -679,38 +732,6 @@ function FloatingGuideBook({ onClick, style }) {
   );
 }
 
-function DrawnTray({ selectedDraws, cardBackUrl }) {
-  return (
-    <div style={drawnTray}>
-      {selectedDraws.map((card) => (
-        <motion.div
-          key={card.id}
-          initial={{ opacity: 0, y: -24, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.24 }}
-          style={trayCard}
-        >
-          <div style={trayCardFace(card.imageUrl ? getAssetUrl(card.imageUrl) : cardBackUrl)} />
-          <span>POSITION {card.position}</span>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-function ReadingContext({ soulMaster, spread, cardBackUrl }) {
-  return (
-    <div style={readingContext}>
-      <div style={contextCardFace(cardBackUrl)} />
-      <div>
-        <div style={goldLabel}>CURRENT RITE</div>
-        <div style={contextMaster}>{soulMaster || 'Soul Master'}</div>
-        <div style={contextSpread}>{spread.name}</div>
-      </div>
-    </div>
-  );
-}
-
 function ResultSpread({ cards, spread, cardBackUrl }) {
   if (spread.key !== 'relationship') {
     return (
@@ -774,7 +795,7 @@ const spreadFrameImage = {
   height: '130%',
   objectFit: 'fill',
   pointerEvents: 'none',
-  opacity: 0.45,
+  opacity: 0.5,
   zIndex: 4
 };
 
@@ -800,13 +821,10 @@ const carouselArrowTap = {
   filter: 'brightness(0.96)'
 };
 const spreadHover = {
-  y: -4,
+  y: -5,
   filter: 'brightness(1.08) drop-shadow(0 0 12px rgba(188,19,254,0.24))',
   boxShadow: '0 0 0 1px rgba(212,175,55,0.36), 0 0 22px rgba(188,19,254,0.26)'
 };
-const drawCardHover = { y: -18, scale: 1.015 };
-const drawCardDrag = { scale: 1.04, zIndex: 200 };
-
 const baseBack = (cardBackUrl) => ({
   border: '1px solid rgba(212,175,55,0.28)',
   borderRadius: '8px',
@@ -828,18 +846,6 @@ const tableCardBack = (cardBackUrl) => ({
   ...baseBack(cardBackUrl),
   width: '104px',
   height: '174px'
-});
-
-const fanCardBack = (cardBackUrl) => ({
-  ...baseBack(cardBackUrl),
-  width: '84px',
-  height: '142px'
-});
-
-const trayCardFace = (cardBackUrl) => ({
-  ...baseBack(cardBackUrl),
-  width: '56px',
-  height: '94px'
 });
 
 const resultCardFace = (cardBackUrl) => ({
@@ -865,11 +871,11 @@ const panel = {
   position: 'relative',
   zIndex: 2,
   width: 'min(620px, 92vw)',
-  background: 'rgba(8,4,13,0.68)',
-  border: '1px solid rgba(212,175,55,0.2)',
+  background: 'rgba(8,4,13,0.4)',
+  border: '1px solid rgba(212,175,55,0.005)',
   backdropFilter: 'blur(0.5px)',
   borderRadius: '8px',
-  padding: '34px',
+  padding: '20px 34px',
   boxShadow: '0 0 38px rgba(0,0,0,0.45)'
 };
 const spreadHeader = {
@@ -896,7 +902,7 @@ const spreadSubtitle = {
   fontSize: '0.82rem',
   lineHeight: 1.32,
   letterSpacing: '0.08em',
-  marginTop: 0
+  marginBottom: '16px'
 };
 const spreadSubtitleLine = {
   height: '1px',
@@ -906,49 +912,105 @@ const spreadPanel = {
   position: 'relative',
   zIndex: 2,
   width: 'min(1180px, 96vw)',
-  minHeight: '560px',
+  minHeight: '100px',
   overflow: 'visible',
   textAlign: 'center',
-  isolation: 'isolate'
+  isolation: 'isolate',
 };
 const questionLayout = {
-    position: 'relative',
-    zIndex: 2,
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 640px) 150px',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '44px',
-    width: 'min(920px, 92vw)'
+  position: 'relative',
+  zIndex: 2,
+  display: 'grid',
+  gridTemplateColumns: 'clamp(112px, 13vw, 170px) minmax(0, 640px) clamp(112px, 13vw, 170px)',
+  gridTemplateAreas: '"balance panel deck"',
+  alignItems: 'center',
+  justifyContent: 'center',
+  justifyItems: 'center',
+  gap: 'clamp(14px, 2.4vw, 34px)',
+  width: 'min(1080px, 94vw)',
+  transform: 'translateY(18px)'
 };
-const questionPanel = { ...panel, width: '100%', boxSizing: 'border-box' };
+const questionPanel = {
+  ...panel,
+  gridArea: 'panel',
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  overflow: 'visible',
+  isolation: 'isolate',
+  border: '1px solid rgba(212,175,55,0.035)',
+  background: 'linear-gradient(180deg, rgba(8,4,13,0.48), rgba(4,2,8,0.36))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), inset 0 -18px 42px rgba(0,0,0,0.22), 0 22px 64px rgba(0,0,0,0.48)',
+  transition: 'border-color 180ms ease, box-shadow 180ms ease, filter 180ms ease'
+};
+const questionPanelFocused = {
+  borderColor: 'rgba(188,19,254,0.2)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), inset 0 -20px 46px rgba(0,0,0,0.25), 0 0 24px rgba(188,19,254,0.16), 0 34px 82px rgba(0,0,0,0.58)',
+  filter: 'brightness(1.04)'
+};
+const questionPanelFocusBeam = {
+  position: 'absolute',
+  left: '50%',
+  bottom: '-108px',
+  width: '72%',
+  height: '190px',
+  transform: 'translateX(-50%)',
+  background: 'radial-gradient(ellipse at center bottom, rgba(188,19,254,0.34), rgba(188,19,254,0.12) 42%, transparent 74%)',
+  filter: 'blur(12px)',
+  borderRadius: '50%',
+  pointerEvents: 'none',
+  zIndex: -1,
+  transition: 'opacity 180ms ease'
+};
+const questionFocusRay = {
+  position: 'absolute',
+  width: '2px',
+  background: 'linear-gradient(to top, rgba(255,255,255,0), rgba(188,19,254,0.2) 12%, rgba(219,143,255,0.88) 52%, rgba(188,19,254,0))',
+  boxShadow: '0 0 12px rgba(188,19,254,0.64)',
+  transformOrigin: '50% 100%',
+  pointerEvents: 'none',
+  zIndex: -1,
+  transition: 'opacity 180ms ease'
+};
+const questionBalanceColumn = {
+  position: 'relative',
+  gridArea: 'balance',
+  zIndex: 3,
+  width: '100%',
+  minWidth: 0
+};
 const questionDeckColumn = {
   position: 'relative',
+  gridArea: 'deck',
   zIndex: 3,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: '18px'
+  justifyContent: 'center',
+  gap: '18px',
+  width: '100%',
+  minWidth: 0
 };
 const questionGuideBookButton = {
   position: 'relative',
   right: 'auto',
   bottom: 'auto',
   width: '82px',
-  height: '82px'
+  height: '82px',
+  filter: 'drop-shadow(0 0 20px rgba(188,19,254,0.24))'
 };
 const questionMagicCircleFloor = {
   position: 'absolute',
   left: '50%',
-  bottom: '-116px',
-  width: 'min(1280px, 118vw)',
-  height: '320px',
+  bottom: '-126px',
+  width: 'min(1320px, 116vw)',
+  height: '336px',
   maxWidth: 'none',
   transform: 'translateX(-50%)',
   objectFit: 'contain',
   objectPosition: 'center bottom',
-  opacity: 0.58,
-  filter: 'brightness(0.9) saturate(0.92)',
+  opacity: 0.62,
+  filter: 'brightness(0.92) saturate(0.94)',
   pointerEvents: 'none',
   userSelect: 'none',
   zIndex: 0
@@ -1043,7 +1105,7 @@ const spreadCarouselCard = {
   transformStyle: 'preserve-3d',
   boxSizing: 'border-box',
   cursor: 'pointer',
-  backdropFilter: 'blur(2px)',
+  backdropFilter: 'blur(2.8px)',
   zIndex:2
 };
 const activeSpreadDisplayCard = {
@@ -1182,7 +1244,7 @@ const spreadDescBlock = {
   justifyContent: 'center',
   color: 'rgba(255,255,255,0.82)',
   fontSize: '0.85rem',
-  lineHeight: 1.62,
+  lineHeight: 1.65,
   letterSpacing: '0.03em',
   wordBreak: 'break-word',
   overflowWrap: 'anywhere',
@@ -1208,9 +1270,10 @@ const spreadAside = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  justifyContent: 'center',
   gap: '7px',
-  paddingTop: '2px',
-  marginBottom: '14px',
+  paddingTop: '4px',
+  marginBottom: '12px',
   borderTop: '1px solid rgba(212,175,55,0.16)',
   color: 'rgba(255,255,255,0.64)',
   fontSize: '0.76rem',
@@ -1242,13 +1305,19 @@ const questionInput = {
   marginBottom: '22px',
   background: 'rgba(0,0,0,0.42)',
   color: '#fff',
-  border: '1px solid rgba(255,255,255,0.14)',
+  border: '1px solid rgba(212,175,55,0.09)',
   borderRadius: '6px',
   padding: '14px',
   outline: 'none',
   fontSize: '1rem',
   fontFamily: zhFont,
-  letterSpacing: '0.03em'
+  letterSpacing: '0.03em',
+  transition: 'border-color 180ms ease, box-shadow 180ms ease, background 180ms ease'
+};
+const questionInputFocused = {
+  borderColor: 'rgba(188,19,254,0.28)',
+  background: 'rgba(7,2,12,0.58)',
+  boxShadow: 'inset 0 0 18px rgba(188,19,254,0.1), 0 0 14px rgba(188,19,254,0.12)'
 };
 const deckStack = { position: 'relative', width: '148px', height: '226px' };
 const deckShadow = {
@@ -1282,52 +1351,6 @@ const shuffleSurface = { position: 'absolute', inset: '4% 4% 18%', transform: 'p
 const shuffleControl = { position: 'absolute', left: '50%', bottom: '22px', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' };
 const portalText = { color: '#d4af37', letterSpacing: '5px', fontSize: '0.78rem' };
 const shuffleHint = { maxWidth: '560px', margin: 0, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontFamily: zhFont, lineHeight: 1.7, fontSize: '0.92rem' };
-const drawStage = {
-  position: 'relative',
-  zIndex: 2,
-  width: '100%',
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  paddingTop: '10px'
-};
-const drawHeader = { textAlign: 'center', position: 'relative', zIndex: 3 };
-const fanDeck = { position: 'relative', width: 'min(1720px, 99vw)', height: '500px', marginTop: '-4px' };
-const fanSlot = { position: 'absolute', left: 'calc(50% - 42px)', bottom: '-118px', transformOrigin: 'bottom center' };
-const drawnTray = {
-  position: 'absolute',
-  left: '50%',
-  bottom: '4px',
-  transform: 'translateX(-50%)',
-  display: 'flex',
-  alignItems: 'flex-end',
-  justifyContent: 'center',
-  gap: '18px',
-  minHeight: '124px'
-};
-const trayCard = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#d4af37', fontSize: '0.62rem', letterSpacing: '2px' };
-const readingContext = {
-  position: 'absolute',
-  left: '42px',
-  top: '84px',
-  zIndex: 4,
-  display: 'grid',
-  gridTemplateColumns: '58px minmax(0, 160px)',
-  alignItems: 'center',
-  gap: '14px',
-  color: '#fff',
-  pointerEvents: 'none'
-};
-const contextCardFace = (cardBackUrl) => ({
-  ...baseBack(cardBackUrl),
-  width: '54px',
-  height: '92px',
-  boxShadow: '0 10px 24px rgba(0,0,0,0.45)'
-});
-const contextMaster = { fontSize: '0.95rem', letterSpacing: '1.5px', lineHeight: 1.25 };
-const contextSpread = { marginTop: '7px', color: 'rgba(255,255,255,0.64)', fontSize: '0.74rem', letterSpacing: '1px' };
 const resultStage = {
   position: 'relative',
   zIndex: 2,
@@ -1375,9 +1398,10 @@ const bookOverlay = {
 };
 const openBook = {
   position: 'relative',
-  width: 'min(820px, 82vw)',
+  width: 'min(920px, 84vw)',
+  maxHeight: '76vh',
   aspectRatio: '16 / 9.5',
-  backgroundImage: 'url(/mystery-content.png)',
+  backgroundImage: 'url(/assets/tarot/mystery-content.png)',
   backgroundRepeat: 'no-repeat',
   backgroundSize: 'contain',
   backgroundPosition: 'center',
@@ -1405,10 +1429,10 @@ const bookCloseX = {
 };
 const bookLeftContent = {
   position: 'absolute',
-  left: '13.2%',
-  top: '15.6%',
-  width: '34%',
-  height: '69%',
+  left: '13.6%',
+  top: '14.5%',
+  width: '33.5%',
+  height: '70%',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -1416,10 +1440,10 @@ const bookLeftContent = {
 };
 const bookRightContent = {
   position: 'absolute',
-  right: '13.5%',
-  top: '16.6%',
+  right: '13.8%',
+  top: '14.8%',
   width: '33%',
-  height: '68%',
+  height: '70%',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -1471,20 +1495,24 @@ const bookCloseButton = {
   justifyContent: 'center',
   alignItems: 'center',
   gap: '3px',
-  minWidth: '260px',
+  minWidth: '252px',
   marginTop: 'auto',
-  marginBottom: '9%',
-  padding: '15px 24px',
-  borderRadius: '4px',
-  border: '1px solid rgba(212,175,55,0.58)',
-  background: 'linear-gradient(180deg, rgba(58,30,76,0.94), rgba(25,12,36,0.96))',
+  marginBottom: '10%',
+  padding: '14px 24px 13px',
+  borderRadius: '6px',
+  border: '1px solid rgba(212,175,55,0.68)',
+  background: 'linear-gradient(180deg, rgba(74,38,96,0.96), rgba(31,14,45,0.98))',
   color: '#f9e8c8',
   cursor: 'pointer',
   fontFamily: zhFont,
   fontSize: '1.08rem',
   letterSpacing: '0.18em',
-  boxShadow: '0 10px 24px rgba(0,0,0,0.32), inset 0 0 18px rgba(212,175,55,0.12)',
+  boxShadow: '0 14px 26px rgba(32,16,42,0.42), 0 0 0 1px rgba(36,20,12,0.42), inset 0 1px 0 rgba(255,239,188,0.18), inset 0 -12px 22px rgba(0,0,0,0.28)',
   transition: 'filter 140ms ease, transform 140ms ease'
+};
+const bookButtonHover = {
+  filter: 'brightness(1.1) drop-shadow(0 0 16px rgba(212,175,55,0.26))',
+  y: -2
 };
 
 const spreadImageWrap = {
@@ -1548,6 +1576,31 @@ const drawSystemCSS = `
   }
 
   @media (max-width: 780px) {
+    .question-rite-layout {
+      grid-template-columns: minmax(0, 1fr) !important;
+      grid-template-areas:
+        "panel"
+        "deck" !important;
+      width: 94vw !important;
+      gap: 14px !important;
+      transform: translateY(0) !important;
+    }
+
+    .question-rite-panel {
+      grid-area: panel !important;
+    }
+
+    .question-balance-column {
+      display: none !important;
+    }
+
+    .question-deck-column {
+      grid-area: deck !important;
+      justify-self: center !important;
+      transform: scale(0.74);
+      transform-origin: center top;
+    }
+
     .spread-selection-stage {
       height: 398px !important;
       max-width: 100vw !important;

@@ -147,6 +147,7 @@ export default function TarotPage() {
   const isDrawingRoute = location.pathname === '/tarot/drawing';
   const [activeTab, setActiveTab] = useState('origins');
   const [drawingView, setDrawingView] = useState('home');
+  const [drawingBackHandler, setDrawingBackHandler] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const hasHandledProfileJump = useRef(false);
 
@@ -194,6 +195,11 @@ export default function TarotPage() {
 
     setDrawingView((view) => view === 'active_draw' ? 'home' : view);
   }, [isDrawingRoute]);
+
+  const handleTopBack = useCallback(() => {
+    if (isDrawingRoute && drawingBackHandler?.()) return;
+    navigate(-1);
+  }, [drawingBackHandler, isDrawingRoute, navigate]);
 
   useEffect(() => {
     if (hasHandledProfileJump.current) return;
@@ -421,7 +427,7 @@ export default function TarotPage() {
 
       <nav style={topNavBar}>
         <div style={{ display:'flex', alignItems:'center',gap:'25px'}}>
-            <BackBtn onClick={() => navigate(-1)} />
+            <BackBtn onClick={handleTopBack} />
             <div style={navBrandStyle} onClick={() => navigate('/maindashboard')}>MYSTIC ARCHIVE</div></div>
         <div style={navTabsContainer}>
           {['origins', 'codex', 'drawing', 'history'].map((tab) => (
@@ -616,7 +622,7 @@ export default function TarotPage() {
             </div>
 
           ) : (
-            <TarotDrawingSystem cardBackUrl={TAROT_CARD_BACK_URL} />
+            <TarotDrawingSystem cardBackUrl={TAROT_CARD_BACK_URL} onBackHandlerChange={setDrawingBackHandler} />
           )}
           </>
 )}
