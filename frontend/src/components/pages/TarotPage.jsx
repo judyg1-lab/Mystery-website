@@ -319,12 +319,14 @@ export default function TarotPage() {
     if (hasHandledProfileJump.current) return;
 
     const targetTab = location.state?.targetTab;
+    const targetHistoryId = location.state?.targetHistoryId;
 
-    if (targetTab) {
+    if (targetTab || targetHistoryId) {
       hasHandledProfileJump.current = true;
+      const nextTab = targetHistoryId ? 'history' : targetTab;
 
-      if (targetTab !== activeTab) {
-        setActiveTab(targetTab);
+      if (nextTab !== activeTab) {
+        setActiveTab(nextTab);
         setDrawingView('home');
         setSearchQuery('');
         setSelectedItemId(null);
@@ -336,13 +338,17 @@ export default function TarotPage() {
 
   useEffect(() => {
     const targetId = location.state?.targetId;
+    const targetTitle = location.state?.targetTitle;
 
-    if (!targetId || articles.length === 0) return;
+    if ((!targetId && !targetTitle) || articles.length === 0) return;
 
-    const exists = articles.some(article => article.id === Number(targetId));
+    const matched = articles.find(article =>
+      article.id === Number(targetId) ||
+      (targetTitle && article.title === targetTitle)
+    );
 
-    if (exists) {
-      setSelectedItemId(Number(targetId));
+    if (matched) {
+      setSelectedItemId(matched.id);
       setSelectedType('article');
       setSelectedTarotEntry(null);
     }
@@ -445,7 +451,14 @@ export default function TarotPage() {
     }
   };
 
-  const processedHistoryLogs = historyLogs;
+  const processedHistoryLogs = historyLogs.filter((log) => {
+    const title = log.title || '';
+    const content = log.content || '';
+    const looksLikeCodexArticle =
+      /秘典|克勞利|托特之書|THOTH ARCHIVE|No\.\d|The Fool|The Magus/.test(title) ||
+      /本秘典|每一張主牌|星軌對應|啟示義理|No\.\d/.test(content);
+    return !looksLikeCodexArticle;
+  });
 
   const filteredHistoryLogs = processedHistoryLogs.filter(log =>
     (log.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -484,6 +497,15 @@ export default function TarotPage() {
     }
 
     if (activeTab === 'history') {
+      const targetHistoryId = Number(location.state?.targetHistoryId);
+      const targetHistory = processedHistoryLogs.find(log => log.id === targetHistoryId);
+      if (targetHistory && selectedItemId !== targetHistory.id) {
+        setSelectedItemId(targetHistory.id);
+        setSelectedType('history');
+        setSelectedTarotEntry(null);
+        return;
+      }
+
       const selectedExistsInHistory =
         selectedType === 'history' &&
         processedHistoryLogs.some(log => log.id === selectedItemId);
@@ -504,7 +526,7 @@ export default function TarotPage() {
       setSelectedType('article');
       setSelectedTarotEntry(null);
     }
-  }, [activeTab, processedArticles, processedHistoryLogs, selectedItemId, selectedType]);
+  }, [activeTab, processedArticles, processedHistoryLogs, selectedItemId, selectedType, location.state]);
 
   const handleHistoryHeartClick = async (e, rec) => {
     if (e) e.stopPropagation();

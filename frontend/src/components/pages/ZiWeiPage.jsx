@@ -427,7 +427,7 @@ export default function ZiWeiPage() {
         )}
 
         {(activeTab === 'drawing' || activeTab === 'history') && (
-          <MysticChartTool systemKey="ziwei" view={activeTab === 'history' ? 'history' : 'drawing'} />
+          <MysticChartTool systemKey="ziwei" view={activeTab === 'history' ? 'history' : 'drawing'} targetHistoryId={location.state?.targetHistoryId} />
         )}
         {false && activeTab === 'drawing' && (
           <>
@@ -452,6 +452,7 @@ export default function ZiWeiPage() {
                           onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
                         });
                       }
+                      
                       setDrawingView('active_draw');
                     }}
                     style={invokeGateBtn}

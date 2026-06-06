@@ -447,6 +447,34 @@ export default function ProfilePage() {
     return matchSearch && matchType && matchDate;
   });
 
+  const openFavoriteItem = (item) => {
+    const routeMap = {
+      TAROT: '/tarot',
+      ASTROLOGY: '/astrology',
+      BAZI: '/bazi',
+      ZIWEI: '/ziwei'
+    };
+    const route = routeMap[item.type];
+    if (!route) return;
+
+    if (item.historyId) {
+      navigate(route, { state: { targetHistoryId: item.historyId, targetTab: 'history' } });
+      return;
+    }
+
+    const fallbackTab =
+      item.tabType?.toLowerCase() ||
+      (item.category === 'DIVINATION' ? 'codex' : ['HISTORY', 'MYTHOLOGY'].includes(item.category) ? 'origins' : 'codex');
+
+    navigate(route, {
+      state: {
+        targetId: item.articleId,
+        targetTitle: item.title,
+        targetTab: fallbackTab
+      }
+    });
+  };
+
 
   return (
     <div style={styles.mainLayout}>
@@ -608,18 +636,7 @@ export default function ProfilePage() {
 
                       return (
                         <div key={item.id} className="fav-card"
-                          onClick={() => {
-                                    if (item.type === 'TAROT') {
-                                      // 依據收藏項目的類型導航到對應的詳細頁面，並傳遞必要的狀態參數
-                                      navigate('/tarot', { state: { targetId: item.articleId, targetTab: item.tabType?.toLowerCase() } });
-                                    } else if (item.type === 'ASTROLOGY') {
-                                      navigate('/astrology', { state: { targetId: item.articleId,targetTab: item.tabType?.toLowerCase() } });
-                                    } else if (item.type === 'BAZI') {
-                                      navigate('/bazi', { state: { targetId: item.articleId,targetTab: item.tabType?.toLowerCase() } });
-                                    } else if (item.type === 'ZIWEI') {
-                                      navigate('/ziwei', { state: { targetId: item.articleId,targetTab: item.tabType?.toLowerCase()} });
-                                    }
-                                  }}
+                          onClick={() => openFavoriteItem(item)}
                           style={{
                             ...styles.favCard,
                             display: 'flex', justifyContent: 'space-between',

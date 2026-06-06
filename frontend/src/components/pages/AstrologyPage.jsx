@@ -483,7 +483,7 @@ export default function AstrologyPage() {
 
         {/* --- 線上即時算卦與歷史紀錄佈局 --- */}
         {(activeTab === 'drawing' || activeTab === 'history') && (
-          <MysticChartTool systemKey="astrology" view={activeTab === 'history' ? 'history' : 'drawing'} />
+          <MysticChartTool systemKey="astrology" view={activeTab === 'history' ? 'history' : 'drawing'} targetHistoryId={location.state?.targetHistoryId} />
         )}
         {false && activeTab === 'drawing' && (
           <>

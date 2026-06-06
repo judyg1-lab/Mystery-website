@@ -127,7 +127,7 @@ function buildResult(systemKey, form) {
   };
 }
 
-export default function MysticChartTool({ systemKey, view = 'drawing' }) {
+export default function MysticChartTool({ systemKey, view = 'drawing', targetHistoryId = null }) {
   const system = SYSTEMS[systemKey] || SYSTEMS.ziwei;
   const [mode, setMode] = useState('form');
   const [form, setForm] = useState({ name: '', gender: '女', birthDate: '', birthTime: '', birthPlace: '', question: '' });
@@ -154,10 +154,11 @@ export default function MysticChartTool({ systemKey, view = 'drawing' }) {
   useEffect(() => {
     if (view === 'history') {
       setMode('history');
+      if (targetHistoryId) setSelectedHistoryId(Number(targetHistoryId));
       return;
     }
     if (mode === 'history') setMode(result ? 'result' : 'form');
-  }, [view, mode, result]);
+  }, [view, mode, result, targetHistoryId]);
 
   const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` });
 
@@ -286,14 +287,18 @@ export default function MysticChartTool({ systemKey, view = 'drawing' }) {
       <div style={shell(system, view)}>
         <AnimatePresence mode="wait">
           {mode === 'form' && (
-            systemKey === 'astrology' ? (
-              <motion.form key="astro-form" style={astrologyFormStage} initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} onSubmit={submitChart}>
+            (systemKey === 'astrology' || systemKey === 'ziwei') ? (
+              <motion.form key={`${systemKey}-form`} style={celestialFormStage(system, systemKey)} initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} onSubmit={submitChart}>
                 <div style={astroLeftPane}>
                   <span style={eyebrow(system)}>{system.subtitle}</span>
-                  <h1 style={astroTitle}>西洋星盤</h1>
-                  <p style={astroLead}>輸入你的出生資料，啟動一張專屬命盤。</p>
+                  <h1 style={astroTitle}>{system.title}</h1>
+                  <p style={astroLead}>{systemKey === 'ziwei' ? '輸入你的出生資料，啟動紫微斗數命盤推演。' : '輸入你的出生資料，啟動一張專屬命盤。'}</p>
                   <div style={astroDivider} />
-                  <img src="/assets/astrology/starPlate.png" alt="" style={starPlateImage} />
+                  <img
+                    src={systemKey === 'ziwei' ? '/assets/ziwei/ziweiPlate-transparent.png' : '/assets/astrology/starPlate-transparent.png'}
+                    alt=""
+                    style={starPlateImage(system)}
+                  />
                 </div>
                 <div style={astroRightPane}>
                   <Input label="姓名" value={form.name} onChange={(value) => updateField('name', value)} placeholder="輸入姓名" />
@@ -302,7 +307,7 @@ export default function MysticChartTool({ systemKey, view = 'drawing' }) {
                   <Input label="出生時間" type="time" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} />
                   <label style={{ ...fieldLabel, gridColumn: '1 / -1' }}>出生地<input style={inputStyle} value={form.birthPlace} onChange={(event) => updateField('birthPlace', event.target.value)} placeholder="輸入城市或國家" /></label>
                   <label style={{ ...fieldLabel, gridColumn: '1 / -1' }}>想問的方向<textarea style={{ ...inputStyle, minHeight: 92, resize: 'none' }} maxLength={120} value={form.question} onChange={(event) => updateField('question', event.target.value)} placeholder="感情、事業、流年、人生方向..." /></label>
-                  <motion.button style={astroSubmitButton} whileHover={{ y: -2, filter: 'brightness(1.08)' }} whileTap={{ scale: 0.98 }}>
+                  <motion.button style={astroSubmitButton} whileHover={{ y: -2, filter: 'brightness(1.08)', boxShadow: `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 34px ${system.accentGlow}` }} whileTap={{ scale: 0.98 }}>
                     <Sparkles size={18} /> 開始推演
                   </motion.button>
                 </div>
@@ -424,8 +429,8 @@ function AstrologyResult({ data }) {
 }
 
 const shell = (system, view) => ({
-  width: 'min(1260px, 94vw)',
-  margin: view === 'history' ? '16px auto 0' : '0 auto',
+  width: view === 'history' ? 'calc(100vw - 80px)' : 'min(1260px, 94vw)',
+  margin: view === 'history' ? '16px 40px 0' : '0 auto',
   minHeight: view === 'history' ? 'calc(100vh - 116px)' : 'calc(100vh - 92px)',
   position: 'relative',
   padding: view === 'history' ? '0' : '18px 0',
@@ -436,7 +441,7 @@ const shell = (system, view) => ({
   overflow: 'hidden'
 });
 const formPanel = (system) => ({ maxWidth: 780, margin: '0 auto', padding: 34, borderRadius: 8, border: `1px solid ${system.accentSoft}`, background: 'rgba(4,2,10,0.74)', boxShadow: `0 0 42px ${system.accentSoft}` });
-const astrologyFormStage = {
+const celestialFormStage = (system, systemKey) => ({
   position: 'relative',
   height: 'calc(100vh - 126px)',
   display: 'grid',
@@ -446,15 +451,18 @@ const astrologyFormStage = {
   padding: '22px 28px',
   boxSizing: 'border-box',
   overflow: 'hidden',
-  background: 'radial-gradient(circle at 18% 72%, rgba(19,190,126,0.2), transparent 28%), radial-gradient(circle at 86% 38%, rgba(19,190,126,0.18), transparent 30%)'
-};
+  background:
+    systemKey === 'ziwei'
+      ? 'radial-gradient(circle at 18% 68%, rgba(0,204,255,0.14), transparent 30%), radial-gradient(circle at 84% 38%, rgba(0,204,255,0.12), transparent 32%), linear-gradient(90deg, rgba(0,204,255,0.045), transparent 34%, rgba(0,204,255,0.035))'
+      : 'radial-gradient(circle at 18% 72%, rgba(19,190,126,0.15), transparent 30%), radial-gradient(circle at 86% 38%, rgba(19,190,126,0.12), transparent 32%), linear-gradient(90deg, rgba(80,250,123,0.035), transparent 34%, rgba(80,250,123,0.04))'
+});
 const astroLeftPane = { position: 'relative', minHeight: 560, display: 'grid', alignContent: 'center', justifyItems: 'start' };
-const astroRightPane = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 28px', alignItems: 'start' };
+const astroRightPane = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 28px', alignItems: 'start', padding: 28, border: '1px solid color-mix(in srgb, var(--accent) 42%, transparent)', background: 'linear-gradient(145deg, rgba(0,0,0,0.38), rgba(0,0,0,0.12))', boxShadow: 'inset 0 0 28px color-mix(in srgb, var(--accent) 12%, transparent)' };
 const astroTitle = { margin: '10px 0 12px', color: '#f4ead4', fontSize: 'clamp(3rem, 5.2vw, 5.3rem)', lineHeight: 1, letterSpacing: '0.18em', fontFamily: "'Noto Serif TC', serif" };
 const astroLead = { margin: 0, color: 'rgba(255,255,255,0.74)', fontFamily: "'Noto Serif TC', sans-serif", letterSpacing: '0.06em' };
 const astroDivider = { width: 260, height: 1, margin: '26px 0 12px', background: 'linear-gradient(90deg, rgba(212,175,55,0.76), transparent)' };
-const starPlateImage = { width: 'min(560px, 42vw)', maxHeight: '56vh', objectFit: 'contain', filter: 'drop-shadow(0 0 28px rgba(80,250,123,0.22))' };
-const astroSubmitButton = { gridColumn: '1 / -1', marginTop: 10, height: 64, borderRadius: 6, border: '1px solid rgba(212,175,55,0.58)', background: 'linear-gradient(90deg, rgba(9,70,45,0.58), rgba(4,18,14,0.92), rgba(9,70,45,0.58))', color: '#f4ead4', fontFamily: "'Cinzel', serif", fontSize: '1.05rem', letterSpacing: '0.22em', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 28px rgba(80,250,123,0.16)' };
+const starPlateImage = (system) => ({ width: 'min(560px, 42vw)', maxHeight: '56vh', objectFit: 'contain', filter: `drop-shadow(0 0 28px ${system.accentGlow})`, mixBlendMode: 'screen' });
+const astroSubmitButton = { gridColumn: '1 / -1', marginTop: 10, height: 64, borderRadius: 4, border: '1px solid color-mix(in srgb, var(--accent) 62%, rgba(212,175,55,0.5))', background: 'linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent), rgba(0,0,0,0.22), color-mix(in srgb, var(--accent) 14%, transparent))', color: '#f4ead4', fontFamily: "'Cinzel', serif", fontSize: '1.05rem', letterSpacing: '0.22em', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 22px color-mix(in srgb, var(--accent) 16%, transparent)', transition: 'transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease' };
 const headline = { marginBottom: 26 };
 const eyebrow = (system) => ({ color: system.accent, letterSpacing: '0.28em', fontSize: '0.72rem', textTransform: 'uppercase' });
 const titleStyle = { margin: '8px 0 10px', color: '#fff', fontFamily: 'Cinzel, serif', fontSize: 'clamp(2rem, 5vw, 4.3rem)', letterSpacing: '0.08em' };
@@ -480,9 +488,9 @@ const infoCell = (system) => ({ display: 'grid', gap: 4, padding: 14, borderRadi
 const tableStyle = { width: '100%', borderCollapse: 'collapse', color: 'rgba(255,255,255,0.82)' };
 const luckGrid = { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 };
 const astroWrap = { display: 'grid', gridTemplateColumns: '360px minmax(0, 1fr)', gap: 22, alignItems: 'start' };
-const historyLayout = { display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 24, alignItems: 'stretch', width: '100%' };
-const historySidebar = (system) => ({ minHeight: 620, padding: 20, borderRadius: 8, border: `1px solid ${system.accentSoft}`, background: 'rgba(4,2,9,0.54)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', gap: 12 });
-const historyContent = (system) => ({ minHeight: 620, padding: 28, borderRadius: 8, border: `1px solid ${system.accentSoft}`, background: 'rgba(3,1,8,0.42)', boxShadow: `inset 0 0 38px ${system.accentSoft}`, overflow: 'auto' });
+const historyLayout = { display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 25, alignItems: 'stretch', width: '100%', height: 'calc(100vh - 118px)' };
+const historySidebar = (system) => ({ minHeight: 0, padding: 20, borderRadius: 8, border: `1px solid ${system.accentSoft}`, background: 'rgba(4,2,9,0.38)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035)', display: 'flex', flexDirection: 'column', gap: 12 });
+const historyContent = (system) => ({ minHeight: 0, padding: 40, borderRadius: 8, border: `1px solid ${system.accentSoft}`, background: 'rgba(3,1,8,0.22)', boxShadow: `inset 0 0 28px ${system.accentSoft}`, overflow: 'auto' });
 const sidebarTitle = (system) => ({ color: system.accent, letterSpacing: '0.32em', fontSize: '0.78rem', padding: '2px 4px 12px', textTransform: 'uppercase' });
 const historySearchInput = (system) => ({ width: '100%', boxSizing: 'border-box', height: 44, borderRadius: 6, border: `1px solid ${system.accentSoft}`, background: 'rgba(255,255,255,0.045)', color: '#fff', padding: '0 14px', outline: 'none', letterSpacing: '0.08em' });
 const historyItem = (system, active) => ({ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center', padding: '14px 16px', borderRadius: 6, border: `1px solid ${active ? system.accent : system.accentSoft}`, background: active ? system.accentSoft : 'rgba(0,0,0,0.24)', color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'background 180ms ease, border-color 180ms ease, transform 180ms ease' });

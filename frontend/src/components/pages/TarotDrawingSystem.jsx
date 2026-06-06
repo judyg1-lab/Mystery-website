@@ -1119,9 +1119,9 @@ const questionPanel = {
 };
 const questionPanelFocused = {
   transform: 'translateZ(-250px)',
-  borderBottom: '1px solid rgba(211,92,255,0.72)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -18px 34px rgba(188,19,254,0.16), inset 0 -44px 72px rgba(0,0,0,0.38), 0 24px 62px rgba(0,0,0,0.62)',
-  filter: 'brightness(1.02)'
+  borderBottom: '1px solid rgba(232,156,255,0.92)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -10px 18px rgba(255,255,255,0.06), inset 0 -24px 52px rgba(188,19,254,0.32), inset 0 -54px 86px rgba(0,0,0,0.36), 0 0 24px rgba(188,19,254,0.2), 0 24px 62px rgba(0,0,0,0.62)',
+  filter: 'brightness(1.08)'
 };
 const questionPanelLineBase = {
   position: 'absolute',
@@ -1240,7 +1240,7 @@ const questionMagicCircleFloor = {
   transform: 'translateX(-50%)',
   objectFit: 'contain',
   objectPosition: 'center bottom',
-  opacity: 0.52,
+  opacity: 0.52, 
   filter: 'brightness(0.8) saturate(0.94)',
   pointerEvents: 'none',
   userSelect: 'none',
@@ -2072,7 +2072,7 @@ const drawSystemCSS = `
   .question-stage {
     position: absolute;
     left: 50%;
-    bottom: -292px;
+    bottom: -260px;
     width: min(1180px, 108vw);
     height: 540px;
     transform: translateX(-50%) rotateX(58deg);
@@ -2118,9 +2118,9 @@ const drawSystemCSS = `
     content: '';
     position: absolute;
     left: 50%;
-    bottom: 212px;
-    width: 18%;
-    height: 420px;
+    bottom: 226px;
+    width: 14%;
+    height: 470px;
     transform: translateX(-50%) rotateX(-58deg) scaleY(0.82);
     transform-origin: center bottom;
     background:
@@ -2138,8 +2138,8 @@ const drawSystemCSS = `
   }
 
   .question-stage.active::before {
-    opacity: 0.68;
-    transform: translateX(-50%) rotateX(-58deg) translateY(-18px) scaleY(1.12);
+    opacity: 0.86;
+    transform: translateX(-50%) rotateX(-58deg) translateY(-28px) scaleY(1.2);
   }
 
   .stage-back-arc,

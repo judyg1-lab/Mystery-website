@@ -451,7 +451,7 @@ export default function BaZiPage() {
         )}
 
         {(activeTab === 'drawing' || activeTab === 'history') && (
-          <MysticChartTool systemKey="bazi" view={activeTab === 'history' ? 'history' : 'drawing'} />
+          <MysticChartTool systemKey="bazi" view={activeTab === 'history' ? 'history' : 'drawing'} targetHistoryId={location.state?.targetHistoryId} />
         )}
         {false && activeTab === 'drawing' && (
           <>
