@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import ProfileIcon from '../ProfileIcon';
 import BackBtn from '../backBtn';
 import MysticModal from '../MysticModal';
+import MysticChartTool from '../MysticChartTool';
 
 const ACCENT = '#ffcc00';
 const hoverGold = 'rgba(255,204,0,0.08)';
@@ -93,7 +94,7 @@ export default function BaZiPage() {
   });
 
   useEffect(() => {
-    if (activeTab === 'drawing') return;
+    if (!['origins', 'codex'].includes(activeTab)) return;
 
     const fetchArticles = async () => {
       try {
@@ -138,7 +139,7 @@ export default function BaZiPage() {
 
   useEffect(() => {
     const targetId = location.state?.targetId;
-    if (!targetId || activeTab === 'drawing' || articles.length === 0) return;
+    if (!targetId || !['origins', 'codex'].includes(activeTab) || articles.length === 0) return;
 
     const exists = articles.some(article => article.id === Number(targetId));
     if (exists) {
@@ -203,17 +204,21 @@ export default function BaZiPage() {
     : (selectedHistory ? { ...selectedHistory } : null);
 
   useEffect(() => {
-    if (activeTab === 'drawing') {
+    if (!['origins', 'codex'].includes(activeTab)) {
       setSelectedItemId(null);
       setSelectedType(null);
       return;
     }
 
-    if (!selectedItemId && processedArticles.length > 0) {
+    const selectedExistsInCurrentTab =
+      selectedType === 'article' &&
+      processedArticles.some(item => item.id === selectedItemId);
+
+    if (!selectedExistsInCurrentTab && processedArticles.length > 0) {
       setSelectedItemId(processedArticles[0].id);
       setSelectedType('article');
     }
-  }, [activeTab, processedArticles, selectedItemId]);
+  }, [activeTab, processedArticles, selectedItemId, selectedType]);
 
   const handleHeartClick = async (e, item) => {
     e.stopPropagation();
@@ -306,7 +311,36 @@ export default function BaZiPage() {
           <div style={navBrandStyle} onClick={() => navigate('/maindashboard')}>MYSTIC ARCHIVE</div>
         </div>
         <div style={navTabsContainer}>
-          {['origins', 'codex', 'drawing'].map((tab) => (
+          {[
+            { key: 'origins', title: 'COSMIC PATH', sub: '八字源流' },
+            { key: 'codex', title: 'ELEMENTS', sub: '干支秘典' },
+            { key: 'drawing', title: 'DIVINATION', sub: '即時推演' },
+            { key: 'history', title: 'HISTORY', sub: '四柱紀錄' }
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key); resetSelection(); }}
+              style={activeTab === tab.key ? activeTabBtn : tabBtn}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = ACCENT;
+                  e.currentTarget.style.textShadow = '0 0 8px rgba(255,204,0,0.6)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.textShadow = 'none';
+                  e.currentTarget.style.transform = 'translateY(0px)';
+                }
+              }}
+            >
+              <div><div>{tab.title}</div><div style={subLabel}>{tab.sub}</div></div>
+              {activeTab === tab.key && <motion.div layoutId="navLine" style={activeUnderline} />}
+            </button>
+          ))}
+          {false && ['origins', 'codex', 'drawing'].map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); resetSelection(); }}
@@ -334,7 +368,15 @@ export default function BaZiPage() {
           ))}
         </div>
         <div onClick={() => navigate('/profile')}
-            style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.filter = 'drop-shadow(0 0 10px rgba(188,19,254,0.5))';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.filter = 'none';
+            }}
+            style={{ width: '200px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'transform 160ms ease, filter 160ms ease' }}>
           <div style={{ textAlign: 'right', lineHeight: '1.2' }}>
             <div style={{ fontSize: '0.75rem', color: ACCENT, letterSpacing: '3px', fontFamily: 'Cinzel', fontWeight: 'bold' }}>ONLINE</div>
             <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '1px', fontWeight: 'bold' }}>{username}</div>
@@ -408,7 +450,10 @@ export default function BaZiPage() {
           </div>
         )}
 
-        {activeTab === 'drawing' && (
+        {(activeTab === 'drawing' || activeTab === 'history') && (
+          <MysticChartTool systemKey="bazi" view={activeTab === 'history' ? 'history' : 'drawing'} />
+        )}
+        {false && activeTab === 'drawing' && (
           <>
             {drawingView === 'home' ? (
               <div style={gatewayCenterContainer}>
@@ -515,7 +560,7 @@ export default function BaZiPage() {
   );
 }
 
-const mainLayout = { width: '100%', height: '100vh', background: '#050208', color: '#fff', position: 'relative', overflow: 'hidden', fontFamily: 'Cinzel, serif' };
+const mainLayout = { width: '100%', minHeight: '100vh', background: '#050208', color: '#fff', position: 'relative', overflowX: 'hidden', overflowY: 'auto', fontFamily: 'Cinzel, serif' };
 const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 };
 const topNavBar = {
   boxSizing: 'border-box',
@@ -529,7 +574,7 @@ const tabBtn = { background: 'none', border: 'none', outline: 'none', WebkitTapH
 const activeTabBtn = { ...tabBtn, color: '#fff' };
 const activeUnderline = { position: 'absolute', bottom: -8, left: 0, right: 0, height: '2px', background: ACCENT, boxShadow: `0 0 10px ${ACCENT}` };
 const subLabel = { fontSize: '0.7rem', color: '#666', letterSpacing: '2px', marginTop: '4px' };
-const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'visible' };
+const contentArea = { paddingTop: '80px', minHeight: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'visible', paddingBottom: '60px' };
 const flexLayout = { display: 'flex', height: 'calc(100vh - 80px)', padding: '25px 40px', gap: '25px', alignItems: 'stretch' };
 const sidebarWrapper = {
   width: '320px', flexShrink: 0, background: 'rgba(0, 0, 0, 0.4)', borderRadius: '16px',

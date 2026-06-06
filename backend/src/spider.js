@@ -58,7 +58,6 @@ async function runTarotSpider(text1, text2) {
         masterCodexContent += `【No.${card.no} — ${card.en} (${card.zh})】\n`;
         masterCodexContent += `✦ 星軌對應：${card.element}\n`;
         masterCodexContent += `✦ 啟示義理：${card.detail}\n`;
-        masterCodexContent += `--------------------------------------------------\n\n`;
     });
 
     const combinedTarotArticle = {

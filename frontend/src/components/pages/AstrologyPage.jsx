@@ -7,6 +7,7 @@ import { Pencil, ChevronLeft } from 'lucide-react';
 import ProfileIcon from '../ProfileIcon';
 import BackBtn from '../backBtn';
 import MysticModal from '../MysticModal';
+import MysticChartTool from '../MysticChartTool';
 
 
 class StarDust {
@@ -103,7 +104,7 @@ export default function AstrologyPage() {
 
   // 取得占星文章資料庫文獻庫（對齊 astrology 路由）
   useEffect(() => {
-    if (activeTab === 'drawing') return;
+    if (!['origins', 'codex'].includes(activeTab)) return;
     const fetchRealArticles = async () => {
       try {
         const res = await fetch(`http://localhost:5000/api/astrology/articles?tabType=${activeTab}`);
@@ -216,17 +217,21 @@ export default function AstrologyPage() {
 
   // 預設鎖定分頁第一篇文章
   useEffect(() => {
-    if (activeTab === 'drawing') {
+    if (!['origins', 'codex'].includes(activeTab)) {
       setSelectedItemId(null);
       setSelectedType(null);
       return;
     }
 
-    if (!selectedItemId && processedArticles.length > 0) {
+    const selectedExistsInCurrentTab =
+      selectedType === 'article' &&
+      processedArticles.some(item => item.id === selectedItemId);
+
+    if (!selectedExistsInCurrentTab && processedArticles.length > 0) {
       setSelectedItemId(processedArticles[0].id);
       setSelectedType('article');
     }
-  }, [activeTab, processedArticles, selectedItemId]);
+  }, [activeTab, processedArticles, selectedItemId, selectedType]);
 
   // 處理一般占星文章點擊愛心
   const handleHeartClick = async (e, item) => {
@@ -324,7 +329,36 @@ export default function AstrologyPage() {
           <div style={navBrandStyle} onClick={() => navigate('/maindashboard')}>MYSTIC ARCHIVE</div>
         </div>
         <div style={navTabsContainer}>
-          {['origins', 'codex', 'drawing'].map((tab) => (
+          {[
+            { key: 'origins', title: 'ASTROLOGY', sub: '星盤源流' },
+            { key: 'codex', title: 'CONSTELLATION', sub: '行星秘典' },
+            { key: 'drawing', title: 'DIVINATION', sub: '即時推演' },
+            { key: 'history', title: 'HISTORY', sub: '星盤紀錄' }
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              style={activeTab === tab.key ? activeTabBtn : tabBtn}
+              onClick={() => { setActiveTab(tab.key); setDrawingView('home'); setSearchQuery(''); setSelectedItemId(null); setSelectedType(null); }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = '#50fa7b';
+                  e.currentTarget.style.textShadow = '0 0 8px rgba(80,250,123,0.6)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.key) {
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.textShadow = 'none';
+                  e.currentTarget.style.transform = 'translateY(0px)';
+                }
+              }}
+            >
+              <div><div>{tab.title}</div><div style={subLabel}>{tab.sub}</div></div>
+              {activeTab === tab.key && <motion.div layoutId="navLine" style={activeUnderline} />}
+            </button>
+          ))}
+          {false && ['origins', 'codex', 'drawing'].map((tab) => (
             <button
               key={tab}
               style={activeTab === tab ? activeTabBtn : tabBtn}
@@ -448,7 +482,10 @@ export default function AstrologyPage() {
         )}
 
         {/* --- 線上即時算卦與歷史紀錄佈局 --- */}
-        {activeTab === 'drawing' && (
+        {(activeTab === 'drawing' || activeTab === 'history') && (
+          <MysticChartTool systemKey="astrology" view={activeTab === 'history' ? 'history' : 'drawing'} />
+        )}
+        {false && activeTab === 'drawing' && (
           <>
             {drawingView === 'home' ? (
               <div style={gatewayCenterContainer}>
@@ -579,7 +616,7 @@ export default function AstrologyPage() {
 }
 
 // ================= Styles 與 CSS (翡翠綠調和矩陣) =================
-const mainLayout = { width: '100%', height: '100vh', background: '#050208', color: '#fff', position: 'relative', overflow: 'hidden', fontFamily: 'Cinzel, serif' };
+const mainLayout = { width: '100%', height: '100vh', background: '#020907', color: '#fff', position: 'relative', overflow: 'hidden', fontFamily: 'Cinzel, serif' };
 const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 };
 
 const topNavBar = {
@@ -595,7 +632,7 @@ const activeTabBtn = { ...tabBtn, color: '#fff' };
 const activeUnderline = { position: 'absolute', bottom: -8, left: 0, right: 0, height: '2px', background: '#50fa7b', boxShadow: '0 0 10px rgba(80,250,123,0.6)' };
 const subLabel = { fontSize: '0.7rem', color: '#666', letterSpacing: '2px', marginTop: '4px' };
 
-const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'visible' };
+const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'hidden', paddingBottom: 0, boxSizing: 'border-box' };
 const flexLayout = { display: 'flex', height: 'calc(100vh - 80px)', padding: '25px 40px', gap: '25px', alignItems: 'stretch' };
 
 const sidebarWrapper = {

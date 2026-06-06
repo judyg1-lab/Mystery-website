@@ -58,6 +58,14 @@ enum SystemType {
   ZIWEI
 }
 
+enum TarotSuit {
+  MAJOR
+  WANDS
+  CUPS
+  SWORDS
+  DISKS
+}
+
 model Article {
   id          Int      @id @default(autoincrement())
 
@@ -73,6 +81,29 @@ model Article {
 
   favorites   Favorite[]
   @@index([systemType, tabType])
+}
+
+model TarotCard {
+  id           Int       @id @default(autoincrement())
+  deck         String    @default("THOTH_INSPIRED_MINOR")
+  suit         TarotSuit  // 花色
+  rank         String
+  orderIndex   Int
+  title        String
+  subtitle     String
+  slug         String    @unique
+  imageUrl     String
+  backImageUrl String
+  accentColor  String
+  paletteNote  String
+  meaning      String    @db.Text
+  prompt       String    @db.Text
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deck, orderIndex])
+  @@index([suit, orderIndex])
 }
 
 model History {

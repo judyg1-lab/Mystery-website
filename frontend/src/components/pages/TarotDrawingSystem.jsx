@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Bot, Copy, ExternalLink, Sparkles } from 'lucide-react';
 import TarotDrawStage from './TarotDrawStage';
+import MysticModal from '../MysticModal';
 
 const text = (value) => decodeURIComponent(value);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const DECK_SIZE = 78;
-const QUESTION_FOCUS_RAYS = [
-  { left: '50%', bottom: '-138px', height: '250px', transform: 'translateX(-50%) rotate(0deg)', opacity: 0.82 },
-  { left: '50%', bottom: '-130px', height: '224px', transform: 'translateX(-50%) rotate(-7deg)', opacity: 0.46 },
-  { left: '50%', bottom: '-130px', height: '224px', transform: 'translateX(-50%) rotate(7deg)', opacity: 0.46 },
-  { left: '50%', bottom: '-124px', height: '192px', transform: 'translateX(-50%) rotate(-14deg)', opacity: 0.28 },
-  { left: '50%', bottom: '-124px', height: '192px', transform: 'translateX(-50%) rotate(14deg)', opacity: 0.28 }
+const TAROT_AI_TARGETS = [
+  { label: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { label: 'Claude', url: 'https://claude.ai/new' },
+  { label: 'Gemini', url: 'https://gemini.google.com/app' }
 ];
 
 const COPY = {
@@ -65,7 +65,16 @@ const SPREADS = [
     desc: text('%E4%B8%89%E5%BC%B5%E7%89%8C%EF%BC%8C%E4%B8%8D%E9%99%90%E5%AE%9A%E5%95%8F%E9%A1%8C%E9%A1%9E%E5%9E%8B%EF%BC%8C%E4%BF%9D%E7%95%99%E7%9B%B4%E8%A6%BA%E8%A7%A3%E8%AE%80%E7%A9%BA%E9%96%93%E3%80%82'),
     detail: text('%E9%81%A9%E5%90%88%E4%BD%A0%E5%8F%AA%E6%83%B3%E8%AE%93%E7%89%8C%E5%85%88%E8%AA%AA%E8%A9%B1%EF%BC%8C%E5%86%8D%E6%95%B4%E7%90%86%E7%95%B6%E4%B8%8B%E7%8B%80%E6%85%8B%E3%80%82'),
     count: 3
-    }
+    },
+    {
+    key: 'advice_spread',
+    name: 'Advice Spread',
+    zhName: text('%E5%91%BD%E9%81%8B%E6%8C%87%E5%BC%95'),
+    icon: '/assets/tarot/spread-advice.png',
+    desc: text('%E4%B8%89%E5%BC%B5%E7%89%8C%EF%BC%8C%E7%9C%8B%E8%A6%8B%E5%95%8F%E9%A1%8C%E6%A0%B8%E5%BF%83%E3%80%81%E9%9A%B1%E8%97%8F%E7%9B%B2%E9%BB%9E%E8%88%87%E4%B8%8B%E4%B8%80%E6%AD%A5%E5%BB%BA%E8%AD%B0%E3%80%82'),
+    detail: text('%E9%81%A9%E5%90%88%E7%95%B6%E4%BD%A0%E9%9C%80%E8%A6%81%E6%96%B9%E5%90%91%E3%80%81%E6%8F%90%E7%A4%BA%E6%88%96%E5%91%BD%E9%81%8B%E6%8C%87%E5%BC%95%E6%99%82%E4%BD%BF%E7%94%A8%E3%80%82'),
+    count: 3
+  }
 ];
 
 const SAMPLE_RESULTS = [
@@ -97,6 +106,15 @@ function getAssetUrl(path = '') {
   return `${API_BASE_URL}${path}`;
 }
 
+function runSmoothViewTransition(update) {
+  if (typeof document !== 'undefined' && document.startViewTransition) {
+    document.startViewTransition(() => flushSync(update));
+    return;
+  }
+
+  update();
+}
+
 function getCarouselOffset(index, activeIndex) {
   const total = SPREADS.length;
   let offset = index - activeIndex;
@@ -107,17 +125,21 @@ function getCarouselOffset(index, activeIndex) {
 
 function spreadCarouselCardMotion(offset) {
   const active = offset === 0;
+  const back = Math.abs(offset) >= 2;
 
   return {
-    x: offset * 292,
-    y: active ? 0 : 16,
-    scale: active ? 1 : 0.78,
-    opacity: active ? 1 : 0.46,
-    rotateY: offset * -18,
-    zIndex: active ? 5 : 2,
+    x: back ? offset * 104 : offset * 318,
+    y: active ? 0 : back ? 38 : 18,
+    z: active ? 90 : back ? -250 : -92,
+    scale: active ? 1 : back ? 0.58 : 0.74,
+    opacity: active ? 1 : back ? 0.2 : 0.44,
+    rotateY: back ? offset * -54 : offset * -58,
+    zIndex: active ? 7 : back ? 1 : 4,
     filter: active
       ? 'brightness(1.04) drop-shadow(0 0 18px rgba(212,175,55,0.26))'
-      : 'brightness(0.54) saturate(0.72)'
+      : back
+        ? 'brightness(0.34) saturate(0.55) blur(1px)'
+        : 'brightness(0.48) saturate(0.72)'
   };
 }
 
@@ -236,18 +258,19 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   const [shuffleTick, setShuffleTick] = useState(0);
   const [tarotCards, setTarotCards] = useState([]);
   const [showQuestionGuide, setShowQuestionGuide] = useState(false);
+  const [showQuestionRequiredModal, setShowQuestionRequiredModal] = useState(false);
+  const [showTarotPromptMenu, setShowTarotPromptMenu] = useState(false);
+  const [tarotAiReport, setTarotAiReport] = useState('');
   const [isQuestionFocused, setIsQuestionFocused] = useState(false);
   const [activeSpreadIndex, setActiveSpreadIndex] = useState(1);
+  const [isRiteTransitioning, setIsRiteTransitioning] = useState(false);
+  const [ritualPhase, setRitualPhase] = useState('idle');
+  const [shuffleMode, setShuffleMode] = useState('riffle');
+  const transitionTimelineRef = useRef(null);
+  const spreadPanelRef = useRef(null);
+  const spreadStageRef = useRef(null);
   const shuffleLayout = useMemo(() => createShuffleLayout(), []);
-  const drawableCards = useMemo(() => {
-    const cardsWithKnownImages = tarotCards.filter((card) => {
-      const cupsWithImages = card.suit === 'CUPS' && ['ace', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'].includes(card.rank);
-      const generatedSamples = ['wands-six-victory', 'swords-six-science', 'disks-ten-wealth'].includes(card.slug);
-      return cupsWithImages || generatedSamples;
-    });
-
-    return cardsWithKnownImages.length ? cardsWithKnownImages : tarotCards;
-  }, [tarotCards]);
+  const drawableCards = useMemo(() => tarotCards, [tarotCards]);
 
   useEffect(() => {
     const savedMaster = localStorage.getItem('soul_master_card');
@@ -257,17 +280,27 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
       return;
     }
 
-    setStep('master_gate');
+    const master = MAJOR_MASTERS[Math.floor(Math.random() * MAJOR_MASTERS.length)];
+    localStorage.setItem('soul_master_card', master);
+    setSoulMaster(master);
+    setStep('select_spread');
   }, []);
 
   useEffect(() => {
     if (step !== 'shuffle') return undefined;
 
+    setShuffleMode('riffle');
+    const scatterTimeoutId = window.setTimeout(() => {
+      setShuffleMode('scatter');
+    }, 2850);
     const intervalId = window.setInterval(() => {
       setShuffleTick((tick) => tick + 1);
     }, 760);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearTimeout(scatterTimeoutId);
+      window.clearInterval(intervalId);
+    };
   }, [step]);
 
   useEffect(() => {
@@ -291,17 +324,68 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
     setStep('select_spread');
   };
 
+  const killRiteTransition = useCallback(() => {
+    transitionTimelineRef.current?.kill();
+    transitionTimelineRef.current = null;
+  }, []);
+
+  useEffect(() => () => killRiteTransition(), [killRiteTransition]);
+
   const startShuffle = () => {
-    setSelectedDraws([]);
-    setDrawnCards([]);
-    setIsCompleting(false);
-    setShuffleTick(0);
-    setStep('shuffle');
+    if (isRiteTransitioning) return;
+    if (!question.trim()) {
+      setShowQuestionRequiredModal(true);
+      return;
+    }
+
+    setIsRiteTransitioning(true);
+    setIsQuestionFocused(false);
+    setShowQuestionGuide(false);
+    killRiteTransition();
+    setRitualPhase('summoning');
+
+    runSmoothViewTransition(() => {
+      setSelectedDraws([]);
+      setDrawnCards([]);
+      setTarotAiReport('');
+      setShowTarotPromptMenu(false);
+      setIsCompleting(false);
+      setShuffleTick(0);
+      setShuffleMode('riffle');
+      setStep('shuffle');
+      setRitualPhase('shuffling');
+      setIsRiteTransitioning(false);
+    });
   };
 
   const stopShuffle = () => {
-    setStep('draw_cards');
+    if (isRiteTransitioning) return;
+
+    setIsRiteTransitioning(true);
+    setRitualPhase('stopping');
+    killRiteTransition();
+
+    runSmoothViewTransition(() => {
+      setStep('draw_cards');
+      setRitualPhase('spread');
+      setIsRiteTransitioning(false);
+    });
   };
+
+  const selectSpreadWithRite = useCallback((item) => {
+    if (isRiteTransitioning) return;
+
+    setIsRiteTransitioning(true);
+    setRitualPhase('summoning');
+    killRiteTransition();
+
+    runSmoothViewTransition(() => {
+      setSpread(item);
+      setStep('question');
+      setRitualPhase('waiting_question');
+      setIsRiteTransitioning(false);
+    });
+  }, [isRiteTransitioning, killRiteTransition]);
 
   const drawOneCard = (sourceIndex) => {
     if (isCompleting) return;
@@ -327,12 +411,53 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
 
     if (nextDraws.length === spread.count) {
       setIsCompleting(true);
-      window.setTimeout(() => {
-        setDrawnCards(nextDraws);
-        setStep('result');
-        setIsCompleting(false);
-      }, 850);
+      setRitualPhase('waitingReveal');
     }
+  };
+
+  const completeDrawReading = useCallback(() => {
+    if (!selectedDraws.length) return;
+
+    runSmoothViewTransition(() => {
+      setDrawnCards(selectedDraws);
+      setStep('result');
+      setRitualPhase('reading');
+      setIsCompleting(false);
+    });
+  }, [selectedDraws]);
+
+  const tarotPrompt = useMemo(() => {
+    if (!drawnCards.length) return '';
+    return [
+      `請以托特塔羅專家的角度，分析這次「${spread.name}」占卜。`,
+      `主牌：${soulMaster || 'DEATH'}`,
+      `問題：${question || '未填寫'}`,
+      '',
+      '抽到的牌：',
+      ...drawnCards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `｜${card.meaning}` : ''}`),
+      '',
+      '請分成：牌陣總覽、每張牌的位置解讀、三張牌之間的關係、目前最重要的提醒、具體行動建議。'
+    ].join('\n');
+  }, [drawnCards, question, soulMaster, spread.name]);
+
+  const copyTarotPrompt = async (url) => {
+    if (!tarotPrompt) return;
+    await navigator.clipboard.writeText(tarotPrompt);
+    setShowTarotPromptMenu(false);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const generateTarotAiReport = () => {
+    if (!drawnCards.length) return;
+    setShowTarotPromptMenu(false);
+    setTarotAiReport([
+      `${spread.name} 的核心訊息已經收束。`,
+      '',
+      `主牌 ${soulMaster || 'DEATH'} 讓這次牌陣帶有轉化、切斷舊循環、重新定義選擇的底色。`,
+      `目前最亮的訊號是 ${drawnCards.map((card) => card.name).join('、')}。它們指向一個共同主題：先看清真正的問題，再決定下一步要投入什麼。`,
+      '',
+      '建議：把問題拆成「我能控制」與「我不能控制」兩欄，先對可控制的部分做一個小而明確的行動。'
+    ].join('\n'));
   };
 
   const handlePrevSpread = () => {
@@ -369,7 +494,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   return (
     <section style={systemShell}>
       <style>{drawSystemCSS}</style>
-      {step === 'shuffle' && <TarotPortalParticles active />}
+      {false && step === 'shuffle' && <TarotPortalParticles active />}
 
       <AnimatePresence mode="wait">
         {step === 'checking_master' && (
@@ -393,7 +518,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
         )}
 
         {step === 'select_spread' && (
-          <motion.div key="spread" {...fadeMotion} style={spreadPanel}>
+          <motion.div key="spread" ref={spreadPanelRef} {...fadeMotion} style={spreadPanel} data-rite-phase={ritualPhase}>
             <div style={spreadHeader}>
               <div style={goldLabel}>MASTER CARD: {soulMaster}</div>
               <h2 style={{ ...title, ...spreadTitle }}>Choose A Spread</h2>
@@ -403,7 +528,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
                 <span style={spreadSubtitleLine} />
               </div>
             </div>
-            <div className="spread-selection-stage" style={spreadCarouselStage}>
+            <div ref={spreadStageRef} className="spread-selection-stage" style={spreadCarouselStage}>
               <img className="spread-magic-floor" src="/assets/tarot/magic-circle-floor.png" alt="" style={spreadMagicCircleFloor} />
               <motion.button
                 type="button"
@@ -438,12 +563,12 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
                   transition={{ type: 'spring', stiffness: 260, damping: 28 }}
                   whileHover={spreadHover}
                   onClick={() => {
+                    if (isRiteTransitioning) return;
                     if (!isActiveSpread) {
                       setActiveSpreadIndex(itemIndex);
                       return;
                     }
-                    setSpread(item);
-                    setStep('question');
+                    selectSpreadWithRite(item);
                   }}
                   style={{
                     ...spreadCarouselCard,
@@ -459,7 +584,14 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
                   </span>
                   <div style={spreadImageWrap}>
                     {isActiveSpread && <span style={spreadIconCenterGlow} />}
-                    <img src={item.icon} alt="" style={spreadImage} />
+                    <img
+                      src={item.icon}
+                      alt=""
+                      style={spreadImage}
+                      onError={(event) => {
+                        event.currentTarget.src = '/assets/tarot/guide-book-icon.png';
+                      }}
+                    />
                   </div>
                   <span style={spreadDescBlock}>
                     <span>{item.desc}</span>
@@ -489,33 +621,47 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
         )}
 
         {step === 'question' && (
-          <motion.div key="question" {...fadeMotion} className="question-rite-layout" style={questionLayout}>
+          <motion.div key="question" {...questionRiteMotion} className="question-rite-layout" style={questionLayout} data-rite-phase={ritualPhase}>
             <AnimatePresence>
               {showQuestionGuide && (
-                <QuestionGuideBookModal onClose={() => setShowQuestionGuide(false)} />
+                <QuestionGuideBookModal onClose={() => setShowQuestionGuide(false)} onStart={startShuffle} />
               )}
             </AnimatePresence>
             <div className="question-balance-column" style={questionBalanceColumn} aria-hidden="true" />
-            <div className="question-rite-panel" style={{ ...questionPanel, ...(isQuestionFocused ? questionPanelFocused : null) }}>
-              <span style={{ ...questionPanelFocusBeam, opacity: isQuestionFocused ? 1 : 0 }} />
-              {QUESTION_FOCUS_RAYS.map(({ opacity, ...rayStyle }, index) => (
-                <span
-                  key={`question-focus-ray-${index}`}
-                  style={{ ...questionFocusRay, ...rayStyle, opacity: isQuestionFocused ? opacity : 0 }}
-                />
-              ))}
+            <div className="question-master-card" style={questionMasterCard}>
+              <img
+                src={getAssetUrl('/tarot/cards/main/death.png')}
+                alt="Death"
+                style={questionMasterImage}
+                onError={(event) => {
+                  event.currentTarget.src = cardBackUrl;
+                }}
+              />
+              <span style={questionMasterLabel}>MASTER CARD</span>
+              <strong style={questionMasterName}>DEATH</strong>
+            </div>
+            <div
+              className={`question-rite-panel ${isQuestionFocused ? 'focused' : ''}`}
+              style={{ ...questionPanel, ...(isQuestionFocused ? questionPanelFocused : null) }}
+              onFocus={() => setIsQuestionFocused(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setIsQuestionFocused(false);
+              }}
+            >
+              <span style={{ ...questionPanelTopLine, ...(isQuestionFocused ? questionPanelLineFocused : null) }} />
+              <span style={{ ...questionPanelLeftLine, ...(isQuestionFocused ? questionPanelLineFocused : null) }} />
+              <span style={{ ...questionPanelRightLine, ...(isQuestionFocused ? questionPanelLineFocused : null) }} />
               <div style={goldLabel}>{spread.name}</div>
               <h2 style={title}>Enter Your Question</h2>
               <textarea
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 onFocus={() => setIsQuestionFocused(true)}
-                onBlur={() => setIsQuestionFocused(false)}
                 placeholder={COPY.questionPlaceholder}
                 style={{ ...questionInput, ...(isQuestionFocused ? questionInputFocused : null) }}
                 disabled={showQuestionGuide}
               />
-              <motion.button whileHover={buttonHover} whileTap={{ scale: 0.97 }} onClick={startShuffle} style={primaryButton}>
+              <motion.button whileHover={buttonHover} whileTap={buttonTap} onClick={startShuffle} disabled={isRiteTransitioning} style={primaryButton}>
                 <Sparkles size={17} />
                 START SHUFFLE
               </motion.button>
@@ -524,31 +670,51 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
               <DeckStack cardBackUrl={cardBackUrl} />
               <FloatingGuideBook onClick={() => setShowQuestionGuide(true)} style={questionGuideBookButton} />
             </div>
-            <img src="/assets/tarot/magic-circle-floor.png" alt="" style={questionMagicCircleFloor} />
+            <div className={`question-stage ${isQuestionFocused ? 'active' : ''}`}>
+              <img
+                src="/assets/tarot/magic-circle-floor.png"
+                alt=""
+                style={questionMagicCircleFloor}
+              />
+              <span className="stage-back-arc" />
+              <span className="stage-front-arc" />
+              <span className="stage-beam stage-beam-left" />
+              <span className="stage-beam stage-beam-right" />
+              <svg className="stage-tethers" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <path className="stage-tether stage-tether-left" d="M 50 84 C 43 72, 33 62, 20 39" />
+                <path className="stage-tether stage-tether-center" d="M 50 84 C 50 70, 50 55, 50 34" />
+                <path className="stage-tether stage-tether-right" d="M 50 84 C 57 72, 67 62, 80 39" />
+              </svg>
+              <span className="stage-fog" />
+            </div>
           </motion.div>
         )}
 
         {step === 'shuffle' && (
-          <motion.div key="shuffle" {...fadeMotion} style={shuffleStage}>
+          <motion.div key="shuffle" {...fadeMotion} style={shuffleStage} data-rite-phase={ritualPhase}>
             <div style={shuffleSurface}>
               {shuffleLayout.map((card) => {
                 const seed = (shuffleTick + 1) * (card.id + 3);
                 const randomX = Math.sin(seed * 12.9898) * 0.5 + 0.5;
                 const randomY = Math.sin(seed * 78.233) * 0.5 + 0.5;
                 const randomRotate = Math.sin(seed * 37.719);
+                const riffleSide = card.id % 2 === 0 ? -1 : 1;
+                const riffleLane = (card.stack % 13) - 6;
+                const riffleWave = Math.sin(shuffleTick * 1.2 + card.stack * 0.7) * 28;
+                const isRiffle = shuffleMode === 'riffle';
 
                 return (
                   <motion.div
                     key={card.id}
                     animate={{
-                      x: (randomX - 0.5) * 920,
-                      y: (randomY - 0.5) * 430,
-                      rotate: randomRotate * 92,
-                      scale: 0.5,
-                      opacity: card.id < 70 ? 0.92 : 0.55
+                      x: isRiffle ? riffleLane * 6 + riffleSide * 28 : (randomX - 0.5) * 920,
+                      y: isRiffle ? riffleSide * (76 + riffleWave) : (randomY - 0.5) * 430,
+                      rotate: isRiffle ? riffleSide * (7 + card.stack * 0.4) : randomRotate * 92,
+                      scale: isRiffle ? 0.58 : 0.5,
+                      opacity: isRiffle ? 0.9 : card.id < 70 ? 0.92 : 0.55
                     }}
                     transition={{
-                      duration: 0.72,
+                      duration: isRiffle ? 0.42 : 0.72,
                       delay: card.delay,
                       ease: 'easeInOut'
                     }}
@@ -560,7 +726,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
             <div style={shuffleControl}>
               <div style={portalText}>TABLE SHUFFLE</div>
               <p style={shuffleHint}>{COPY.shuffleHint}</p>
-              <motion.button whileHover={buttonHover} whileTap={{ scale: 0.97 }} onClick={stopShuffle} style={primaryButton}>
+              <motion.button whileHover={buttonHover} whileTap={buttonTap} onClick={stopShuffle} disabled={isRiteTransitioning} style={primaryButton}>
                 <Sparkles size={17} />
                 {COPY.stopShuffle}
               </motion.button>
@@ -577,6 +743,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
             selectedDraws={selectedDraws}
             isCompleting={isCompleting}
             onDrawCard={drawOneCard}
+            onRevealComplete={completeDrawReading}
           />
         )}
 
@@ -588,9 +755,42 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
               <p style={resultSubcopy}>{COPY.selectedPrefix} {drawnCards.length} {COPY.cardUnit}</p>
             </div>
             <ResultSpread cards={drawnCards} spread={spread} cardBackUrl={cardBackUrl} />
+            <div style={tarotResultActions}>
+              <div style={tarotPromptWrap}>
+                <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={() => setShowTarotPromptMenu((open) => !open)}>
+                  <Copy size={16} />
+                  <span>複製 Prompt</span>
+                </motion.button>
+                {showTarotPromptMenu && (
+                  <div className="tarot-prompt-menu" style={tarotPromptMenu}>
+                    {TAROT_AI_TARGETS.map((target) => (
+                      <button key={target.label} type="button" style={tarotPromptMenuItem} onClick={() => copyTarotPrompt(target.url)}>
+                        <span>{target.label}</span>
+                        <ExternalLink size={13} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={generateTarotAiReport}>
+                <Bot size={16} />
+                <span>AI 解讀</span>
+              </motion.button>
+            </div>
+            {tarotAiReport && <pre style={tarotAiReportBox}>{tarotAiReport}</pre>}
           </motion.div>
         )}
       </AnimatePresence>
+      <MysticModal
+        isOpen={showQuestionRequiredModal}
+        onClose={() => setShowQuestionRequiredModal(false)}
+        onConfirm={() => setShowQuestionRequiredModal(false)}
+        title="QUESTION REQUIRED"
+        message={text('%E8%AB%8B%E5%85%88%E8%BC%B8%E5%85%A5%E4%BD%A0%E6%83%B3%E8%A9%A2%E5%95%8F%E7%9A%84%E5%95%8F%E9%A1%8C%EF%BC%8C%E5%86%8D%E9%96%8B%E5%A7%8B%E5%8D%A0%E5%8D%9C%E5%84%80%E5%BC%8F%E3%80%82')}
+        confirmText={text('%E6%88%91%E7%9F%A5%E9%81%93%E4%BA%86')}
+        cancelText=""
+        type="info"
+      />
     </section>
   );
 }
@@ -615,13 +815,14 @@ function DeckStack({ cardBackUrl }) {
   );
 }
 
-function QuestionGuideBookModal({ onClose }) {
+function QuestionGuideBookModal({ onClose, onStart }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={bookOverlay}
+      onClick={onClose}
     >
       <motion.div
         initial={{ rotateX: -10, scale: 0.94, y: 20 }}
@@ -629,13 +830,14 @@ function QuestionGuideBookModal({ onClose }) {
         exit={{ rotateX: 8, scale: 0.96, y: 12 }}
         transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
         style={openBook}
+        onClick={(event) => event.stopPropagation()}
       >
         <motion.button
           type="button"
           aria-label="Close guide"
           onClick={onClose}
           style={bookCloseX}
-          whileHover={{ scale: 1.08, filter: 'drop-shadow(0 0 10px rgba(188,19,254,0.55))' }}
+          whileHover={{ scale: 1.08, filter: 'brightness(1.15) drop-shadow(0 0 10px rgba(188,19,254,0.45))' }}
           whileTap={{ scale: 0.94 }}
         >
           &times;
@@ -652,10 +854,7 @@ function QuestionGuideBookModal({ onClose }) {
 
         <section style={bookRightContent}>
           <p style={bookNote}>{COPY.guideNote}</p>
-          <div style={bookSeal} aria-hidden="true">
-            <div style={bookSealEye}>◉</div>
-          </div>
-          <motion.button type="button" onClick={onClose} style={bookCloseButton} whileHover={bookButtonHover} whileTap={{ scale: 0.97 }}>
+          <motion.button type="button" onClick={onStart || onClose} style={bookCloseButton} whileHover={bookButtonHover} whileTap={{ scale: 0.97 }}>
             <span>{COPY.openRite}</span>
             <small>PROCEED TO DIVINATION</small>
           </motion.button>
@@ -665,57 +864,6 @@ function QuestionGuideBookModal({ onClose }) {
   );
 }
 
-function QuestionGuideBook({ onClose }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={bookOverlay}
-    >
-      <motion.div
-        initial={{ rotateX: -10, scale: 0.94, y: 20 }}
-        animate={{ rotateX: 0, scale: 1, y: 0 }}
-        exit={{ rotateX: 8, scale: 0.96, y: 12 }}
-        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-        style={openBook}
-      >
-        <motion.button
-          type="button"
-          aria-label="Close guide"
-          onClick={onClose}
-          style={bookCloseX}
-          whileHover={{ scale: 1.08, filter: 'drop-shadow(0 0 10px rgba(188,19,254,0.55))' }}
-          whileTap={{ scale: 0.94 }}
-        >
-          ×
-        </motion.button>
-
-        <section style={bookLeftContent}>
-          <div style={bookEyebrow}>QUESTION RITE</div>
-          <h3 style={bookTitle}>儀式祈請</h3>
-          <div style={bookSubtitle}>INVOCATION</div>
-          <p style={bookInvocation}>{COPY.guideBody}</p>
-          <div style={bookDivider} />
-          <p style={bookInstruction}>
-            在進行占卜前，請先靜下心來，專注於你的問題，並以真誠與尊重的心向塔羅牌提出你的請求。讓能量與意圖清晰，指引將更加準確。
-          </p>
-        </section>
-
-        <section style={bookRightContent}>
-          <p style={bookNote}>{COPY.guideNote}</p>
-          <div style={bookSeal} aria-hidden="true">
-            <div style={bookSealEye}>◉</div>
-          </div>
-          <motion.button type="button" onClick={onClose} style={bookCloseButton} whileHover={buttonHover} whileTap={{ scale: 0.97 }}>
-            <span>✦ 開啟占卜儀式 ✦</span>
-            <small>PROCEED TO DIVINATION</small>
-          </motion.button>
-        </section>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 function FloatingGuideBook({ onClick, style }) {
   return (
@@ -804,9 +952,23 @@ const fadeMotion = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 }
 };
+const questionRiteMotion = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 }
+};
 
 const zhFont = "'Noto Serif TC', 'Microsoft JhengHei', 'PingFang TC', sans-serif";
-const buttonHover = { filter: 'brightness(1.12) drop-shadow(0 0 16px rgba(188,19,254,0.46))', color: '#ffffff' };
+const buttonHover = {
+  filter: 'brightness(1.16) saturate(1.15) drop-shadow(0 0 16px rgba(188,19,254,0.46))',
+  background: 'linear-gradient(180deg, rgba(52,24,70,0.92), rgba(18,8,28,0.92))',
+  color: '#ffffff'
+};
+const buttonTap = {
+  scale: 0.97,
+  filter: 'brightness(0.9) saturate(1.25)',
+  background: 'linear-gradient(180deg, rgba(20,8,30,0.95), rgba(68,24,92,0.88))'
+};
 const carouselArrowHover = {
   color: '#ffffff',
   borderColor: 'rgba(241,216,143,0.58)',
@@ -821,8 +983,8 @@ const carouselArrowTap = {
   filter: 'brightness(0.96)'
 };
 const spreadHover = {
-  y: -5,
-  filter: 'brightness(1.08) drop-shadow(0 0 12px rgba(188,19,254,0.24))',
+  y: -4,
+  filter: 'brightness(1.12) drop-shadow(0 0 20px rgba(188,19,254,0.3))',
   boxShadow: '0 0 0 1px rgba(212,175,55,0.36), 0 0 22px rgba(188,19,254,0.26)'
 };
 const baseBack = (cardBackUrl) => ({
@@ -882,8 +1044,8 @@ const spreadHeader = {
   position: 'relative',
   zIndex: 6,
   textAlign: 'center',
-  marginTop: '-38px',
-  marginBottom: '8px',
+  marginTop: '-35px',
+  marginBottom: '7px',
 };
 const spreadTitle = {
   marginBottom: '6px',
@@ -921,56 +1083,118 @@ const questionLayout = {
   position: 'relative',
   zIndex: 2,
   display: 'grid',
-  gridTemplateColumns: 'clamp(112px, 13vw, 170px) minmax(0, 640px) clamp(112px, 13vw, 170px)',
+  gridTemplateColumns: 'clamp(150px, 15vw, 205px) minmax(0, 680px) clamp(150px, 15vw, 205px)',
   gridTemplateAreas: '"balance panel deck"',
   alignItems: 'center',
   justifyContent: 'center',
   justifyItems: 'center',
-  gap: 'clamp(14px, 2.4vw, 34px)',
-  width: 'min(1080px, 94vw)',
-  transform: 'translateY(18px)'
+  gap: 'clamp(8px, 1.8vw, 26px)',
+  width: 'min(1180px, 96vw)',
+  transform: 'translateY(20px)',
+  perspective: '1400px',
+  transformStyle: 'preserve-3d',
+  isolation: 'isolate'
 };
 const questionPanel = {
   ...panel,
   gridArea: 'panel',
+  position: 'relative',
   width: '100%',
   minWidth: 0,
+  padding: '32px 38px 36px',
+  marginTop: '-126px',
   boxSizing: 'border-box',
   overflow: 'visible',
   isolation: 'isolate',
-  border: '1px solid rgba(212,175,55,0.035)',
-  background: 'linear-gradient(180deg, rgba(8,4,13,0.48), rgba(4,2,8,0.36))',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), inset 0 -18px 42px rgba(0,0,0,0.22), 0 22px 64px rgba(0,0,0,0.48)',
-  transition: 'border-color 180ms ease, box-shadow 180ms ease, filter 180ms ease'
+  border: 'none',
+  borderRadius: '8px 8px 18px 18px / 8px 8px 42px 42px',
+  background: 'radial-gradient(130% 150% at 50% 18%, rgba(38,10,54,0.24), rgba(8,4,13,0.19) 44%, rgba(3,1,7,0.42) 100%)',
+  boxShadow: 'inset 38px 0 70px rgba(188,19,254,0.055), inset -38px 0 70px rgba(188,19,254,0.055), inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -32px 62px rgba(0,0,0,0.36), 0 24px 66px rgba(0,0,0,0.5)',
+  transform: 'translateZ(-100px)',
+  transformOrigin: 'center bottom',
+  transformStyle: 'preserve-3d',
+  zIndex: 10,
+  transition: 'border-color 220ms ease, box-shadow 220ms ease, filter 220ms ease, transform 260ms ease',
+  backdropFilter: 'blur(4px)'
 };
 const questionPanelFocused = {
-  borderColor: 'rgba(188,19,254,0.2)',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), inset 0 -20px 46px rgba(0,0,0,0.25), 0 0 24px rgba(188,19,254,0.16), 0 34px 82px rgba(0,0,0,0.58)',
-  filter: 'brightness(1.04)'
+  transform: 'translateZ(-250px)',
+  borderBottom: '1px solid rgba(211,92,255,0.72)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -18px 34px rgba(188,19,254,0.16), inset 0 -44px 72px rgba(0,0,0,0.38), 0 24px 62px rgba(0,0,0,0.62)',
+  filter: 'brightness(1.02)'
 };
-const questionPanelFocusBeam = {
+const questionPanelLineBase = {
   position: 'absolute',
-  left: '50%',
-  bottom: '-108px',
-  width: '72%',
-  height: '190px',
-  transform: 'translateX(-50%)',
-  background: 'radial-gradient(ellipse at center bottom, rgba(188,19,254,0.34), rgba(188,19,254,0.12) 42%, transparent 74%)',
-  filter: 'blur(12px)',
-  borderRadius: '50%',
   pointerEvents: 'none',
-  zIndex: -1,
-  transition: 'opacity 180ms ease'
+  background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(255,255,255,0.08), rgba(212,175,55,0.12))',
+  boxShadow: '0 0 12px rgba(212,175,55,0.06)',
+  transition: 'background 180ms ease, box-shadow 180ms ease'
 };
-const questionFocusRay = {
+const questionPanelTopLine = {
+  ...questionPanelLineBase,
+  left: 0,
+  right: 0,
+  top: 0,
+  height: '1px'
+};
+const questionPanelLeftLine = {
+  ...questionPanelLineBase,
+  left: 0,
+  top: 0,
+  bottom: '32px',
+  width: '1px',
+  background: 'linear-gradient(180deg, rgba(212,175,55,0.12), rgba(255,255,255,0.07), transparent)'
+};
+const questionPanelRightLine = {
+  ...questionPanelLeftLine,
+  left: 'auto',
+  right: 0
+};
+const questionPanelLineFocused = {
+  background: 'linear-gradient(180deg, rgba(188,19,254,0.42), rgba(212,175,55,0.16), transparent)',
+  boxShadow: '0 0 14px rgba(188,19,254,0.24)'
+};
+const questionMasterCard = {
   position: 'absolute',
-  width: '2px',
-  background: 'linear-gradient(to top, rgba(255,255,255,0), rgba(188,19,254,0.2) 12%, rgba(219,143,255,0.88) 52%, rgba(188,19,254,0))',
-  boxShadow: '0 0 12px rgba(188,19,254,0.64)',
-  transformOrigin: '50% 100%',
+  left: 'clamp(18px, 7vw, 72px)',
+  top: 'clamp(-98px, -7vw, -62px)',
+  width: '178px',
+  display: 'grid',
+  justifyItems: 'center',
+  gap: '4px',
+  color: 'rgba(255,255,255,0.7)',
+  fontSize: '0.72rem',
+  letterSpacing: '2.2px',
   pointerEvents: 'none',
-  zIndex: -1,
-  transition: 'opacity 180ms ease'
+  zIndex: 12,
+  transform: 'rotateY(34deg) rotateX(4deg)',
+  transformOrigin: 'center center',
+  transformStyle: 'preserve-3d',
+  animation: 'questionMasterFloat 5.8s ease-in-out infinite',
+  filter: 'drop-shadow(0 26px 34px rgba(0,0,0,0.52)) drop-shadow(0 0 20px rgba(188,19,254,0.18))'
+};
+const questionMasterImage = {
+  width: '130px',
+  height: '218px',
+  objectFit: 'cover',
+  borderRadius: '7px',
+  border: '1px solid rgba(212,175,55,0.52)',
+  boxShadow: 'inset 0 0 0 1px rgba(255,233,172,0.1), 0 18px 32px rgba(0,0,0,0.5), 0 0 24px rgba(188,19,254,0.24), 0 0 12px rgba(212,175,55,0.12)'
+};
+const questionMasterLabel = {
+  marginTop: '8px',
+  color: 'rgba(212,175,55,0.78)',
+  fontSize: '0.82rem',
+  letterSpacing: '0.28em',
+  textShadow: '0 0 10px rgba(212,175,55,0.18)'
+};
+const questionMasterName = {
+  position: 'relative',
+  color: '#f6db9d',
+  fontSize: '1.28rem',
+  lineHeight: 1.1,
+  letterSpacing: '0.2em',
+  textShadow: '0 0 14px rgba(188,19,254,0.22)'
 };
 const questionBalanceColumn = {
   position: 'relative',
@@ -982,35 +1206,42 @@ const questionBalanceColumn = {
 const questionDeckColumn = {
   position: 'relative',
   gridArea: 'deck',
-  zIndex: 3,
+  zIndex: 12,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
   gap: '18px',
+  marginTop: '-79px',
+  marginLeft: '-118px',
   width: '100%',
-  minWidth: 0
+  minWidth: 0,
+  transform: 'rotateY(-34deg) rotateX(4deg)',
+  transformOrigin: 'center center',
+  transformStyle: 'preserve-3d',
+  animation: 'questionDeckFloat 6.2s ease-in-out infinite',
+  filter: 'drop-shadow(0 26px 34px rgba(0,0,0,0.52)) drop-shadow(0 0 20px rgba(188,19,254,0.16))'
 };
 const questionGuideBookButton = {
   position: 'relative',
   right: 'auto',
   bottom: 'auto',
-  width: '82px',
-  height: '82px',
-  filter: 'drop-shadow(0 0 20px rgba(188,19,254,0.24))'
+  width: '92px',
+  height: '92px',
+  filter: 'drop-shadow(0 0 20px rgba(188,19,254,0.46))'
 };
 const questionMagicCircleFloor = {
   position: 'absolute',
   left: '50%',
-  bottom: '-126px',
+  bottom: '-200px',
   width: 'min(1320px, 116vw)',
   height: '336px',
   maxWidth: 'none',
   transform: 'translateX(-50%)',
   objectFit: 'contain',
   objectPosition: 'center bottom',
-  opacity: 0.62,
-  filter: 'brightness(0.92) saturate(0.94)',
+  opacity: 0.52,
+  filter: 'brightness(0.8) saturate(0.94)',
   pointerEvents: 'none',
   userSelect: 'none',
   zIndex: 0
@@ -1034,35 +1265,37 @@ const goldLabel = { color: '#d4af37', fontSize: '0.72rem', letterSpacing: '4px',
 const title = { margin: '0 0 18px', color: '#fff', fontSize: 'clamp(1.45rem, 2.35vw, 2.18rem)', letterSpacing: '3px' };
 const bodyText = { color: 'rgba(255,255,255,0.76)', lineHeight: 1.9, fontFamily: zhFont, marginBottom: '24px', letterSpacing: '0.04em', fontSize: '1rem' };
 const primaryButton = {
+  position: 'relative',
+  zIndex: 14,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: '10px',
   minWidth: '190px',
   border: '1px solid rgba(212,175,55,0.45)',
-  background: 'rgba(14,10,18,0.86)',
+  background: 'linear-gradient(180deg, rgba(18,10,28,0.86), rgba(8,4,13,0.9))',
   color: '#fff',
   padding: '13px 18px',
   borderRadius: '4px',
   cursor: 'pointer',
   letterSpacing: '2px',
   fontFamily: "'Cinzel', serif",
-  transition: 'filter 140ms ease, transform 140ms ease'
+  transition: 'filter 160ms ease, transform 160ms ease, background 160ms ease, color 160ms ease'
 };
 const spreadCarouselStage = {
   position: 'relative',
-  height: '430px',
+  height: '435px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  perspective: '1200px',
+  perspective: '1500px',
   marginTop: '5px',
   overflow: 'visible'
 };
 const spreadMagicCircleFloor = {
   position: 'absolute',
   left: '50%',
-  bottom: '-58px',
+  bottom: '-60px',
   width: 'min(1536px, 120vw)',
   height: '300px',
   maxWidth: 'none',
@@ -1080,17 +1313,18 @@ const spreadCarousel = {
   width: '248px',
   height: '386px',
   transformStyle: 'preserve-3d',
+  transform: 'translateZ(0)',
   cursor: 'grab',
   zIndex: 3
 };
 const spreadCarouselCard = {
   position: 'absolute',
-  top: '-6.5%',
-  left:'-0.5%',
+  top: '-4%',
+  left:'-0.55%',
   display: 'grid',
   gridTemplateRows: 'auto minmax(116px, 1fr) auto auto',
   justifyItems: 'center',
-  rowGap: '12px',
+  rowGap: '6px',
   alignItems: 'center',
   background: 'transparent',
   border: 'none',
@@ -1105,7 +1339,8 @@ const spreadCarouselCard = {
   transformStyle: 'preserve-3d',
   boxSizing: 'border-box',
   cursor: 'pointer',
-  backdropFilter: 'blur(2.8px)',
+  backdropFilter: 'blur(2.2px)',
+  transformOrigin: 'center center',
   zIndex:2
 };
 const activeSpreadDisplayCard = {
@@ -1117,9 +1352,9 @@ const inactiveSpreadDisplayCard = {
 const spreadActiveUplight = {
   position: 'absolute',
   left: '50%',
-  bottom: '-26px',
-  width: '68%',
-  height: '120px',
+  bottom: '-20px',
+  width: '70%',
+  height: '140px',
   transform: 'translateX(-50%)',
   background: 'linear-gradient(to top, rgba(188,19,254,0.28), rgba(212,175,55,0.12) 42%, transparent 80%)',
   filter: 'blur(15px)',
@@ -1141,8 +1376,8 @@ const spreadIconCenterGlow = {
   position: 'absolute',
   left: '50%',
   top: '50%',
-  width: '95px',
-  height: '95px',
+  width: '100px',
+  height: '100px',
   transform: 'translate(-50%, -50%)',
   borderRadius: '50%',
   background: 'radial-gradient(circle, rgba(255,255,255,0.18), rgba(212,175,55,0.16) 18%, rgba(188,19,254,0.18) 42%, transparent 68%)',
@@ -1298,17 +1533,20 @@ const selectSpreadButton = {
   zIndex: 8
 };
 const questionInput = {
+  position: 'relative',
+  zIndex: 14,
   width: '100%',
-  minHeight: '132px',
+  minHeight: '180px',
   boxSizing: 'border-box',
   resize: 'vertical',
   marginBottom: '22px',
   background: 'rgba(0,0,0,0.42)',
   color: '#fff',
-  border: '1px solid rgba(212,175,55,0.09)',
+  border: '1px solid rgba(212,175,55,0.075)',
   borderRadius: '6px',
   padding: '14px',
   outline: 'none',
+  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.14)',
   fontSize: '1rem',
   fontFamily: zhFont,
   letterSpacing: '0.03em',
@@ -1319,7 +1557,7 @@ const questionInputFocused = {
   background: 'rgba(7,2,12,0.58)',
   boxShadow: 'inset 0 0 18px rgba(188,19,254,0.1), 0 0 14px rgba(188,19,254,0.12)'
 };
-const deckStack = { position: 'relative', width: '148px', height: '226px' };
+const deckStack = { position: 'relative', width: '148px', height: '200px' };
 const deckShadow = {
   position: 'absolute',
   left: '20px',
@@ -1346,29 +1584,164 @@ const stackLabel = {
   fontSize: '0.72rem',
   letterSpacing: '1px'
 };
-const shuffleStage = { position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const shuffleSurface = { position: 'absolute', inset: '4% 4% 18%', transform: 'perspective(1200px) rotateX(10deg)' };
-const shuffleControl = { position: 'absolute', left: '50%', bottom: '22px', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' };
+const shuffleStage = {
+  position: 'relative',
+  zIndex: 2,
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden'
+};
+const shuffleMagicFloor = {
+  position: 'absolute',
+  left: '50%',
+  bottom: '-72px',
+  width: 'min(1320px, 116vw)',
+  height: '342px',
+  maxWidth: 'none',
+  transform: 'translateX(-50%)',
+  objectFit: 'contain',
+  objectPosition: 'center bottom',
+  opacity: 0.72,
+  filter: 'brightness(0.92) saturate(0.96)',
+  pointerEvents: 'none',
+  userSelect: 'none',
+  zIndex: 0
+};
+const shuffleSacredGlow = {
+  position: 'absolute',
+  left: '50%',
+  bottom: '70px',
+  width: '520px',
+  height: '240px',
+  transform: 'translateX(-50%)',
+  borderRadius: '50%',
+  background: 'radial-gradient(ellipse at center bottom, rgba(255,255,255,0.12), rgba(188,19,254,0.22) 24%, rgba(212,175,55,0.08) 44%, transparent 72%)',
+  filter: 'blur(24px)',
+  pointerEvents: 'none',
+  zIndex: 1
+};
+const shuffleSurface = {
+  position: 'absolute',
+  inset: '4% 4% 18%',
+  transform: 'perspective(1200px) rotateX(10deg)',
+  zIndex: 3
+};
+const shuffleControl = {
+  position: 'absolute',
+  left: '50%',
+  bottom: '22px',
+  transform: 'translateX(-50%)',
+  zIndex: 5,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '10px'
+};
 const portalText = { color: '#d4af37', letterSpacing: '5px', fontSize: '0.78rem' };
 const shuffleHint = { maxWidth: '560px', margin: 0, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontFamily: zhFont, lineHeight: 1.7, fontSize: '0.92rem' };
 const resultStage = {
   position: 'relative',
   zIndex: 2,
   width: 'min(1080px, 96vw)',
-  height: '590px',
+  minHeight: '620px',
   backdropFilter: 'blur(2px)',
   display: 'flex',
   flexDirection: 'column',
-  alignItems: 'center'
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingTop: '18px',
+  boxSizing: 'border-box'
 };
 const resultHeader = { textAlign: 'center', marginTop: '8px' };
 const resultSubcopy = { margin: '-8px 0 0', color: 'rgba(255,255,255,0.68)', fontFamily: zhFont, letterSpacing: '0.08em' };
-const simpleResultSpread = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '34px', flex: 1, width: '100%' };
+const simpleResultSpread = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '34px', flex: '0 0 auto', width: '100%', minHeight: '300px' };
 const relationshipSpread = { position: 'relative', flex: 1, width: 'min(760px, 92vw)', minHeight: '460px' };
 const resultCardWrap = { width: '142px', textAlign: 'center', color: '#fff' };
 const resultNumber = { color: '#d4af37', fontSize: '0.62rem', letterSpacing: '2px', marginBottom: '7px' };
 const resultName = { color: '#fff', fontSize: '0.92rem', letterSpacing: '1.5px', lineHeight: 1.35 };
 const resultSubtitle = { marginTop: '5px', color: 'rgba(212,175,55,0.72)', fontSize: '0.68rem', letterSpacing: '1px' };
+const tarotResultActions = {
+  position: 'relative',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: '12px',
+  marginTop: '18px',
+  zIndex: 12
+};
+const tarotPromptWrap = { position: 'relative' };
+const tarotActionButton = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '9px',
+  minWidth: '148px',
+  height: '42px',
+  padding: '0 18px',
+  borderRadius: '6px',
+  border: '1px solid rgba(212,175,55,0.34)',
+  background: 'linear-gradient(180deg, rgba(42,12,58,0.72), rgba(5,2,10,0.86))',
+  color: '#f7e8bd',
+  fontFamily: "'Cinzel', serif",
+  fontSize: '0.78rem',
+  letterSpacing: '0.12em',
+  cursor: 'pointer',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.34)',
+  transition: 'filter 180ms ease, border-color 180ms ease, transform 180ms ease'
+};
+const tarotActionHover = {
+  y: -2,
+  borderColor: 'rgba(188,19,254,0.54)',
+  filter: 'brightness(1.08)'
+};
+const tarotPromptMenu = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 'calc(100% + 10px)',
+  transform: 'translateX(-50%)',
+  zIndex: 20,
+  display: 'grid',
+  gap: '6px',
+  minWidth: '176px',
+  padding: '8px',
+  borderRadius: '6px',
+  border: '1px solid rgba(188,19,254,0.28)',
+  background: 'rgba(8,3,15,0.96)',
+  boxShadow: '0 18px 38px rgba(0,0,0,0.48)'
+};
+const tarotPromptMenuItem = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  height: '36px',
+  padding: '0 12px',
+  borderRadius: '4px',
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(255,255,255,0.035)',
+  color: 'rgba(255,255,255,0.82)',
+  fontFamily: "'Cinzel', serif",
+  fontSize: '0.74rem',
+  letterSpacing: '0.12em',
+  cursor: 'pointer',
+  transition: 'background 160ms ease, color 160ms ease, transform 160ms ease'
+};
+const tarotAiReportBox = {
+  width: 'min(720px, 92vw)',
+  margin: '16px auto 0',
+  padding: '16px 18px',
+  borderRadius: '6px',
+  border: '1px solid rgba(188,19,254,0.2)',
+  background: 'rgba(5,2,10,0.62)',
+  color: 'rgba(255,255,255,0.78)',
+  fontFamily: zhFont,
+  fontSize: '0.86rem',
+  lineHeight: 1.8,
+  whiteSpace: 'pre-wrap'
+};
 const floatingGuideBook = {
   position: 'absolute',
   right: '22px',
@@ -1388,19 +1761,20 @@ const guideBookImage = {
   pointerEvents: 'none'
 };
 const bookOverlay = {
-  position: 'absolute',
-  inset: '-80px',
-  zIndex: 8,
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
   display: 'grid',
   placeItems: 'center',
-  background: 'rgba(2,1,6,0.74)',
-  backdropFilter: 'blur(4px)'
+  background: 'rgba(2,1,6,0.36)',
+  backdropFilter: 'blur(8px) brightness(0.66)',
+  WebkitBackdropFilter: 'blur(8px) brightness(0.66)',
 };
 const openBook = {
   position: 'relative',
-  width: 'min(920px, 84vw)',
-  maxHeight: '76vh',
-  aspectRatio: '16 / 9.5',
+  width: 'min(800px, 92vw)',
+  maxHeight: '85vh',
+  aspectRatio: '16 / 9.25',
   backgroundImage: 'url(/assets/tarot/mystery-content.png)',
   backgroundRepeat: 'no-repeat',
   backgroundSize: 'contain',
@@ -1412,27 +1786,29 @@ const openBook = {
 };
 const bookCloseX = {
   position: 'absolute',
-  top: '7.2%',
-  right: '7.4%',
-  zIndex: 3,
-  width: '34px',
-  height: '34px',
+  top: '8.4%',
+  right: '10.2%',
+  zIndex: 6,
+  width: '30px',
+  height: '30px',
   borderRadius: '50%',
-  border: '1px solid rgba(74,45,24,0.28)',
-  background: 'rgba(34,20,30,0.72)',
-  color: '#f8e6c6',
-  fontSize: '1.35rem',
+  border: '1px solid rgba(248,226,180,0.48)',
+  background: 'rgba(39,21,45,0.72)',
+  color: '#f7ddb8',
+  fontSize: '1.2rem',
   lineHeight: 1,
   cursor: 'pointer',
+  padding: 0,
   display: 'grid',
-  placeItems: 'center'
+  placeItems: 'center',
+  fontFamily: "'Cinzel', serif"
 };
 const bookLeftContent = {
   position: 'absolute',
-  left: '13.6%',
-  top: '14.5%',
-  width: '33.5%',
-  height: '70%',
+  left: '14.8%',
+  top: '14.4%',
+  width: '33.8%',
+  height: '69%',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -1440,47 +1816,47 @@ const bookLeftContent = {
 };
 const bookRightContent = {
   position: 'absolute',
-  right: '13.8%',
-  top: '14.8%',
-  width: '33%',
-  height: '70%',
+  right: '13.2%',
+  top: '16.2%',
+  width: '32.6%',
+  height: '68%',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   textAlign: 'center'
 };
-const bookEyebrow = { marginTop: '5%', color: 'rgba(86,58,37,0.72)', fontFamily: "'Cinzel', serif", fontSize: '0.78rem', letterSpacing: '0.46em' };
-const bookTitle = { margin: '8% 0 0', fontSize: 'clamp(1.55rem, 3vw, 2.8rem)', letterSpacing: '0.2em', color: '#2b2140', fontWeight: 700 };
-const bookSubtitle = { marginTop: '1%', color: 'rgba(86,58,37,0.72)', fontFamily: "'Cinzel', serif", fontSize: '0.9rem', letterSpacing: '0.36em' };
+const bookEyebrow = { marginTop: '2%', color: 'rgba(86,58,37,0.68)', fontFamily: "'Cinzel', serif", fontSize: 'clamp(0.46rem, 0.7vw, 0.64rem)', letterSpacing: '0.44em', fontWeight: 500 };
+const bookTitle = { margin: '4.2% 0 0', fontSize: 'clamp(1.25rem, 2.45vw, 2.18rem)', letterSpacing: '0.18em', color: '#2b2140', fontWeight: 700 };
+const bookSubtitle = { marginTop: '0.6%', color: 'rgba(86,58,37,0.7)', fontFamily: "'Cinzel', serif", fontSize: 'clamp(0.5rem, 0.78vw, 0.72rem)', letterSpacing: '0.34em' };
 const bookInvocation = {
-  margin: '9% 0 0',
+  margin: '7% 0 0',
   color: '#2b2140',
-  fontSize: 'clamp(0.95rem, 1.55vw, 1.35rem)',
-  lineHeight: 2.05,
+  fontSize: 'clamp(0.66rem, 1.04vw, 0.9rem)',
+  lineHeight: 1.82,
   fontWeight: 600,
   whiteSpace: 'pre-line'
 };
-const bookDivider = { width: '72%', height: '1px', margin: '7% 0 5%', background: 'linear-gradient(90deg, transparent, rgba(92,56,26,0.58), transparent)' };
+const bookDivider = { width: '70%', height: '1px', margin: '4.8% 0 3.8%', background: 'linear-gradient(90deg, transparent, rgba(92,56,26,0.52), transparent)' };
 const bookInstruction = {
-  width: '76%',
+  width: '78%',
   margin: 0,
   color: 'rgba(43,33,64,0.82)',
-  fontSize: 'clamp(0.75rem, 1.05vw, 1rem)',
-  lineHeight: 2,
+  fontSize: 'clamp(0.52rem, 0.76vw, 0.68rem)',
+  lineHeight: 1.76,
   fontWeight: 600
 };
 const bookNote = {
-  width: '72%',
-  margin: '7% 0 0',
+  width: '70%',
+  margin: '4.8% 0 0',
   color: 'rgba(43,33,64,0.86)',
-  fontSize: 'clamp(0.82rem, 1.15vw, 1.05rem)',
-  lineHeight: 1.9,
+  fontSize: 'clamp(0.6rem, 0.86vw, 0.76rem)',
+  lineHeight: 1.72,
   fontWeight: 600
 };
 const bookSeal = {
-  width: '48%',
+  width: '44%',
   aspectRatio: '1',
-  marginTop: '7%',
+  marginTop: '5.8%',
   borderRadius: '50%',
   display: 'grid',
   placeItems: 'center',
@@ -1488,26 +1864,35 @@ const bookSeal = {
   background: 'radial-gradient(circle, rgba(92,56,26,0.12), transparent 62%)',
   boxShadow: 'inset 0 0 22px rgba(92,56,26,0.12)'
 };
-const bookSealEye = { color: 'rgba(92,56,26,0.58)', fontSize: '2.4rem', transform: 'rotate(8deg)' };
+const bookSealEye = {
+  display: 'block',
+  width: '58%',
+  height: '32%',
+  borderRadius: '50%',
+  border: '2px solid rgba(92,56,26,0.34)',
+  background: 'radial-gradient(circle at center, rgba(92,56,26,0.34) 0 12%, transparent 13% 100%)',
+  fontSize: 0,
+  transform: 'rotate(8deg)'
+};
 const bookCloseButton = {
   display: 'inline-flex',
   flexDirection: 'column',
   justifyContent: 'center',
   alignItems: 'center',
-  gap: '3px',
-  minWidth: '252px',
+  gap: '2px',
+  minWidth: '162px',
   marginTop: 'auto',
   marginBottom: '10%',
-  padding: '14px 24px 13px',
+  padding: '8px 13px 7px',
   borderRadius: '6px',
   border: '1px solid rgba(212,175,55,0.68)',
   background: 'linear-gradient(180deg, rgba(74,38,96,0.96), rgba(31,14,45,0.98))',
   color: '#f9e8c8',
   cursor: 'pointer',
   fontFamily: zhFont,
-  fontSize: '1.08rem',
-  letterSpacing: '0.18em',
-  boxShadow: '0 14px 26px rgba(32,16,42,0.42), 0 0 0 1px rgba(36,20,12,0.42), inset 0 1px 0 rgba(255,239,188,0.18), inset 0 -12px 22px rgba(0,0,0,0.28)',
+  fontSize: '0.68rem',
+  letterSpacing: '0.14em',
+  boxShadow: '0 10px 18px rgba(32,16,42,0.34), 0 0 0 1px rgba(36,20,12,0.38), inset 0 1px 0 rgba(255,239,188,0.16), inset 0 -9px 18px rgba(0,0,0,0.24)',
   transition: 'filter 140ms ease, transform 140ms ease'
 };
 const bookButtonHover = {
@@ -1535,6 +1920,16 @@ const spreadImage = {
 };
 
 const drawSystemCSS = `
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 420ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  ::view-transition-new(root) {
+    mix-blend-mode: normal;
+  }
+
   @keyframes spreadPortalSpin {
     from {
       rotate: 0deg;
@@ -1571,8 +1966,377 @@ const drawSystemCSS = `
     }
   }
 
+  @keyframes questionMasterFloat {
+    0%, 100% {
+      transform: rotateY(34deg) rotateX(4deg) translateY(0);
+    }
+
+    50% {
+      transform: rotateY(34deg) rotateX(4deg) translateY(-8px);
+    }
+  }
+
+  @keyframes questionDeckFloat {
+    0%, 100% {
+      transform: rotateY(-34deg) rotateX(4deg) translateY(0);
+    }
+
+    50% {
+      transform: rotateY(-34deg) rotateX(4deg) translateY(-7px);
+    }
+  }
+
   .tarot-drawing-copy strong {
     font-family: 'Cinzel', serif;
+  }
+
+  .tarot-prompt-menu button:hover {
+    background: rgba(188,19,254,0.16) !important;
+    color: #fff !important;
+    transform: translateY(-1px);
+  }
+
+  .question-guide-button-caption {
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+  }
+
+  .question-rite-panel:not(.focused):hover {
+    transform: translateZ(-250px) !important;
+  }
+
+  .question-rite-panel > * {
+    transform: translateZ(18px);
+  }
+
+  .question-rite-panel::before,
+  .question-rite-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -386px;
+    width: 2.5px;
+    height: 410px;
+    border: 0;
+    border-radius: 999px;
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.95) 0%,
+        rgba(219,154,255,0.92) 9%,
+        rgba(188,19,254,0.84) 42%,
+        rgba(96,18,168,0.62) 72%,
+        transparent 100%
+      );
+    display: none;
+    opacity: 0;
+    filter:
+      drop-shadow(0 0 8px rgba(255,255,255,0.48))
+      drop-shadow(0 0 20px rgba(188,19,254,0.86))
+      drop-shadow(0 0 42px rgba(188,19,254,0.55));
+    pointer-events: none;
+    transform-origin: top center;
+    transition:
+      opacity 120ms ease,
+      filter 180ms ease,
+      transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: -1;
+  }
+
+  .question-rite-panel::before {
+    left: 3.8%;
+    transform: rotateZ(9deg) rotateX(0deg) translateZ(-8px);
+  }
+
+  .question-rite-panel::after {
+    right: 3.8%;
+    transform: rotateZ(-9deg) rotateX(0deg) translateZ(-8px);
+  }
+
+  .question-rite-panel.focused::before,
+  .question-rite-panel.focused::after {
+    opacity: 0;
+    filter:
+      drop-shadow(0 0 10px rgba(255,255,255,0.72))
+      drop-shadow(0 0 24px rgba(188,19,254,0.95))
+      drop-shadow(0 0 56px rgba(188,19,254,0.72));
+  }
+
+  .question-rite-panel.focused::before {
+    transform: rotateZ(9deg) rotateX(-4deg) translateZ(4px);
+  }
+
+  .question-rite-panel.focused::after {
+    transform: rotateZ(-9deg) rotateX(-4deg) translateZ(4px);
+  }
+
+  .question-stage {
+    position: absolute;
+    left: 50%;
+    bottom: -292px;
+    width: min(1180px, 108vw);
+    height: 540px;
+    transform: translateX(-50%) rotateX(58deg);
+    transform-origin: center bottom;
+    transform-style: preserve-3d;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+    opacity: 0.78;
+    filter: brightness(0.92) saturate(0.96);
+    transition:
+      opacity 260ms ease,
+      transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+      filter 260ms ease;
+  }
+
+  .question-stage.active {
+    opacity: 1;
+    transform: translateX(-50%) rotateX(58deg);
+    filter: drop-shadow(0 0 16px rgba(188,19,254,0.22));
+  }
+
+  .question-stage.active img {
+    opacity: 0.96 !important;
+    filter: brightness(1.08) saturate(1.02) !important;
+  }
+
+  .question-stage img {
+    position: absolute !important;
+    left: 50% !important;
+    bottom: 34px !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    transform: translateX(-50%) !important;
+    object-fit: contain !important;
+    opacity: 0.82 !important;
+    filter: brightness(0.92) saturate(0.96) !important;
+    z-index: 1 !important;
+  }
+
+  .question-stage::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 212px;
+    width: 18%;
+    height: 420px;
+    transform: translateX(-50%) rotateX(-58deg) scaleY(0.82);
+    transform-origin: center bottom;
+    background:
+      radial-gradient(ellipse at center bottom,
+        rgba(255,255,255,0.48) 0%,
+        rgba(188,19,254,0.42) 14%,
+        rgba(188,19,254,0.16) 44%,
+        transparent 78%);
+    filter: blur(16px);
+    opacity: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    transition: opacity 220ms ease, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 2;
+  }
+
+  .question-stage.active::before {
+    opacity: 0.68;
+    transform: translateX(-50%) rotateX(-58deg) translateY(-18px) scaleY(1.12);
+  }
+
+  .stage-back-arc,
+  .stage-front-arc {
+    position: absolute;
+    left: 50%;
+    width: 74%;
+    height: 118px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    border: 1px solid rgba(188,19,254,0.34);
+    box-shadow:
+      0 0 12px rgba(188,19,254,0.28),
+      inset 0 0 18px rgba(212,175,55,0.08);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .stage-back-arc {
+    bottom: 258px;
+    opacity: 0.16;
+  }
+
+  .stage-front-arc {
+    bottom: 156px;
+    opacity: 0.2;
+    border-color: rgba(212,175,55,0.22);
+  }
+
+  .question-stage.active .stage-back-arc {
+    opacity: 0.52;
+  }
+
+  .question-stage.active .stage-front-arc {
+    opacity: 0.78;
+  }
+
+  .stage-fog {
+    position: absolute;
+    left: 50%;
+    bottom: 112px;
+    width: 86%;
+    height: 190px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse at center,
+        rgba(255,255,255,0.08) 0%,
+        rgba(188,19,254,0.28) 24%,
+        rgba(212,175,55,0.11) 44%,
+        transparent 74%);
+    filter: blur(28px);
+    opacity: 0.42;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .question-stage.active .stage-fog {
+    opacity: 0.58;
+    animation: stageFogBreath 3.2s ease-in-out infinite;
+  }
+
+  .stage-tethers {
+    position: absolute;
+    left: 50%;
+    bottom: 198px;
+    width: 64%;
+    height: 390px;
+    transform: translateX(-50%) rotateX(-58deg);
+    transform-origin: center bottom;
+    opacity: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 4;
+    transition: opacity 180ms ease, transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .stage-tether {
+    fill: none;
+    stroke: rgba(214,117,255,0.78);
+    stroke-width: 0.42;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 3px rgba(188,19,254,0.78)) drop-shadow(0 0 8px rgba(188,19,254,0.42));
+  }
+
+  .stage-tether-center {
+    stroke: rgba(255,236,255,0.84);
+    stroke-width: 0.34;
+  }
+
+  .question-stage.active .stage-tethers {
+    opacity: 0.92;
+    transform: translateX(-50%) rotateX(-58deg) translateY(-16px);
+  }
+
+  .stage-beam {
+    position: absolute;
+    bottom: 250px;
+    width: 150px;
+    height: 800px;
+    transform-origin: bottom center;
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+    background:
+      linear-gradient(
+        to top,
+        transparent 0%,
+        rgba(188,19,254,0.34) 16%,
+        rgba(255,255,255,0.18) 48%,
+        rgba(188,19,254,0.08) 72%,
+        transparent 100%
+      );
+    filter: blur(13px) drop-shadow(0 0 18px rgba(188,19,254,0.42));
+    transition:
+      opacity 260ms ease,
+      transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .stage-beam::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -18px;
+    right: -18px;
+    background: inherit;
+    filter: blur(16px);
+    opacity: 0.42;
+  }
+
+  .stage-beam::after {
+    content: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to top,
+      transparent,
+      rgba(255,255,255,0.72) 34%,
+      rgba(255,226,160,0.62) 62%,
+      transparent
+    );
+    box-shadow:
+      0 0 8px rgba(255,255,255,0.38),
+      0 0 18px rgba(188,19,254,0.42);
+  }
+
+  .stage-beam-left {
+    left: 49.2%;
+    transform: translateX(-50%) rotate(-30deg) rotateX(-58deg) scaleY(0.86);
+  }
+
+  .stage-beam-right {
+    right: auto;
+    left: 50.8%;
+    transform: translateX(-50%) rotate(30deg) rotateX(-58deg) scaleY(0.86);
+  }
+
+  .question-stage.active .stage-beam {
+    opacity: 0.52;
+  }
+
+  .question-stage.active .stage-beam-left {
+    transform: translateX(-50%) rotate(-30deg) rotateX(-58deg) translateY(-16px) scaleY(1.16);
+  }
+
+  .question-stage.active .stage-beam-right {
+    transform: translateX(-50%) rotate(30deg) rotateX(-58deg) translateY(-16px) scaleY(1.16);
+  }
+
+  @keyframes stageFogBreath {
+    0%, 100% {
+      filter: blur(14px) saturate(1.08) brightness(0.95);
+    }
+
+    50% {
+      filter: blur(16px) saturate(1.22) brightness(1.14);
+    }
+  }
+
+  @keyframes panelCornerPulse {
+    0%, 100% {
+      transform: translateY(5px) scale(0.92);
+      filter: blur(7px) brightness(0.94);
+    }
+
+    50% {
+      transform: translateY(0) scale(1.05);
+      filter: blur(6px) brightness(1.18);
+    }
   }
 
   @media (max-width: 780px) {
@@ -1588,10 +2352,29 @@ const drawSystemCSS = `
 
     .question-rite-panel {
       grid-area: panel !important;
+      transform: rotateX(4deg) translateZ(0) !important;
+    }
+
+    .question-rite-panel:not(.focused):hover {
+      transform: translateZ(-250px) !important;
+    }
+
+    .question-rite-panel::before,
+    .question-rite-panel::after {
+      height: 320px !important;
+      bottom: -304px !important;
     }
 
     .question-balance-column {
       display: none !important;
+    }
+
+    .question-master-card {
+      left: 0 !important;
+      top: -150px !important;
+      width: 128px !important;
+      transform: rotateY(18deg) rotateX(4deg) scale(0.72) !important;
+      transform-origin: left top !important;
     }
 
     .question-deck-column {
@@ -1599,6 +2382,17 @@ const drawSystemCSS = `
       justify-self: center !important;
       transform: scale(0.74);
       transform-origin: center top;
+    }
+
+    .question-stage {
+      width: 132vw !important;
+      bottom: -284px !important;
+      height: 420px !important;
+      transform: translateX(-50%) rotateX(76deg) translateZ(-50px) !important;
+    }
+
+    .stage-beam {
+      display: none !important;
     }
 
     .spread-selection-stage {
@@ -1629,3 +2423,4 @@ const drawSystemCSS = `
     }
   }
 `;
+ 

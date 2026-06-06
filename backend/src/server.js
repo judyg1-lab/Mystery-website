@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors()); // 允許跨網域連線（讓妳 localhost:3000 的 React 能存取 5000 的後端）
 app.use(express.json()); // 解析 JSON 格式的請求體，讓我們可以在 req.body 看到前端傳來的資料
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'))); // 讓 /uploads 路徑對應到 uploads 資料夾，提供靜態檔案服務（讓上傳的大頭貼可以被瀏覽器讀取）
+app.use('/tarot', express.static(path.join(__dirname, '../public/tarot')));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -241,6 +242,39 @@ app.get('/api/tarot/articles', async (req, res) => {
     }
 });
 
+app.get('/api/tarot/cards', async (req, res) => {
+    const { suit } = req.query;
+    const where = {};
+    if (suit) where.suit = suit.toUpperCase();
+
+    try {
+        const suitOrder = { MAJOR: 0, WANDS: 1, CUPS: 2, SWORDS: 3, DISKS: 4 };
+        const cards = await prisma.tarotCard.findMany({ where });
+        cards.sort((a, b) =>
+            (suitOrder[a.suit] ?? 99) - (suitOrder[b.suit] ?? 99) ||
+            a.orderIndex - b.orderIndex
+        );
+        res.json(cards);
+    } catch (error) {
+        console.error('Failed to load tarot cards:', error);
+        res.status(500).json({ error: 'Failed to load tarot cards' });
+    }
+});
+
+app.get('/api/tarot/cards/:slug', async (req, res) => {
+    try {
+        const card = await prisma.tarotCard.findUnique({
+            where: { slug: req.params.slug }
+        });
+
+        if (!card) return res.status(404).json({ error: 'Tarot card not found' });
+        res.json(card);
+    } catch (error) {
+        console.error('Failed to load tarot card:', error);
+        res.status(500).json({ error: 'Failed to load tarot card' });
+    }
+});
+
 app.get('/api/astrology/articles', async (req, res) => {
     const { tabType } = req.query;
     try {
@@ -375,5 +409,54 @@ app.get('/api/history/ziwei', authenticateToken, async (req, res) => {
         res.status(500).json({ error: '讀取紫微歷史紀錄失敗' });
     }
 });
+const HISTORY_SYSTEMS = {
+    tarot: 'TAROT',
+    astrology: 'ASTROLOGY',
+    bazi: 'BAZI',
+    ziwei: 'ZIWEI'
+};
+
+app.post('/api/history/:system', authenticateToken, async (req, res) => {
+    const systemType = HISTORY_SYSTEMS[String(req.params.system || '').toLowerCase()];
+    const { title, content } = req.body || {};
+
+    if (!systemType) {
+        return res.status(400).json({ error: 'Unsupported history system' });
+    }
+
+    if (!title || !content) {
+        return res.status(400).json({ error: 'title and content are required' });
+    }
+
+    try {
+        const history = await prisma.history.create({
+            data: {
+                userId: req.user.userId,
+                systemType,
+                title,
+                content
+            }
+        });
+
+        res.status(201).json({
+            history: {
+                id: history.id,
+                title: history.title,
+                content: history.content,
+                date: history.createdAt.toLocaleDateString('zh-TW', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }),
+                isFavorite: false,
+                favoriteId: null
+            }
+        });
+    } catch (error) {
+        console.error('Create history failed:', error);
+        res.status(500).json({ error: 'Failed to create history' });
+    }
+});
+
 app.listen(PORT, () => { //啟動 Express 伺服器，監聽指定的 PORT 埠號。監聽完，執行後續函式
     console.log(`Mystic Master API 正在埠號 ${PORT} `);});
