@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, CalendarDays, Check, ChevronDown, Clock, Compass, Copy, ExternalLink, Heart, MapPin, Sparkles, User, VenusAndMars } from 'lucide-react';
+import { Bot, CalendarDays, Check, ChevronDown, Clock, Compass, Copy, ExternalLink, Heart, MapPin, Pencil, Sparkles, Trash2, User, VenusAndMars } from 'lucide-react';
 import MysticModal from './MysticModal';
+import ZiWeiResult from './results/ZiWeiResult';
+import BaZiResult from './results/BaZiResult';
+import AstrologyResult from './results/AstrologyResult';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const t = (value) => decodeURIComponent(value);
@@ -60,6 +63,32 @@ function parseContent(content) {
 }
 
 function createPrompt(system, form, result) {
+  if (system.api === 'bazi') {
+    return [
+      `你是一位資深${system.title}命理諮詢師，熟悉干支、十神、藏干、五行旺衰、格局、喜用、流年與大運判讀，也能把傳統命理轉成現代人能理解的具體建議。請全程使用繁體中文。`,
+      '請根據下列資料做完整八字四柱分析。若出生時間或出生地未填，請明確標示哪些判斷只能作為概略參考；不要恐嚇、不要宿命論，請用清楚、溫柔、可行動的語氣。',
+      '',
+      `姓名：${form.name}`,
+      `性別：${form.gender}`,
+      `出生日期：${form.birthDate || '未填'}`,
+      `出生時間：${form.birthTime || '未填'}`,
+      `出生地：${form.birthPlace || '未填'}`,
+      `提問方向：${form.question || '請分析整體命運走向'}`,
+      '',
+      `四柱資料：${JSON.stringify(result.data, null, 2)}`,
+      '',
+      '請務必依照以下結構輸出：',
+      '1. 命盤總覽：用 2-3 段說明日主、整體五行氣勢、命局核心矛盾與優勢。',
+      '2. 四柱逐柱解析：年柱、月柱、日柱、時柱分開說明，每柱至少包含十神意義、天干地支互動、對家庭/性格/事業/晚運的象徵。',
+      '3. 五行與喜用：分析木火土金水的旺弱、平衡方式、喜用方向，並給出生活、工作、環境與習慣上的調整建議。',
+      '4. 感情與人際：說明關係模式、吸引的人、容易卡住的點、可練習的溝通方式。',
+      '5. 事業與財務：說明適合的工作型態、合作方式、財務策略、風險提醒。',
+      '6. 近期流年提醒：用溫和語氣指出近期需要注意的節奏、選擇與機會。',
+      '7. 三個具體行動建議：每個建議都要可執行，不要只寫抽象口號。',
+      '最後請加上一段「總結箴言」，像命理師給使用者的一段收束建議。'
+    ].join('\n');
+  }
+
   return [
     `你是一位資深${system.title}諮詢師，熟悉傳統命理語彙，也能用現代心理與行動建議轉譯。請用繁體中文回覆，語氣清楚、溫柔、具體，不做恐嚇式斷言。`,
     `請根據以下資料做完整判讀，若生日、時間或出生地不足，請明確說明哪些部分只能作為概略參考。`,
@@ -82,7 +111,7 @@ function createReport(system, form, result) {
 
 function buildResult(systemKey, form) {
   const seed = hashSeed(`${systemKey}-${form.name}-${form.birthDate}-${form.birthTime}-${form.birthPlace}`);
-  const title = `${form.name || '未命名'} ${formatDateTime()}`;
+  const title = form.question?.trim() || '未命名標題';
 
   if (systemKey === 'ziwei') {
     return {
@@ -145,7 +174,7 @@ function buildResult(systemKey, form) {
   };
 }
 
-export default function MysticChartTool({ systemKey, view = 'drawing', targetHistoryId = null }) {
+export default function MysticChartTool({ systemKey, view = 'drawing', targetHistoryId = null, resetKey = 0 }) {
   const system = SYSTEMS[systemKey] || SYSTEMS.ziwei;
   const [mode, setMode] = useState('form');
   const [form, setForm] = useState({ name: '', gender: '女', birthDate: '', birthTime: '', birthPlace: '', question: '' });
@@ -157,6 +186,7 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
   const [showPromptMenu, setShowPromptMenu] = useState(false);
   const [isAiReading, setIsAiReading] = useState(false);
   const [modal, setModal] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const activeForm = result?.form || form;
   const prompt = useMemo(() => (result ? createPrompt(system, activeForm, result) : ''), [activeForm, result, system]);
@@ -176,8 +206,15 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
       if (targetHistoryId) setSelectedHistoryId(Number(targetHistoryId));
       return;
     }
-    if (mode === 'history') setMode(result ? 'result' : 'form');
+    if (mode === 'history') setMode('form');
   }, [view, mode, result, targetHistoryId]);
+
+  useEffect(() => {
+    if (view === 'history') return;
+    setMode('form');
+    setResult(null);
+    setShowPromptMenu(false);
+  }, [resetKey, view, system.api]);
 
   const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` });
 
@@ -299,6 +336,77 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
     setMode('result');
   }
 
+  function closeModal() {
+    setModal(null);
+    setRenameDraft('');
+  }
+
+  function requestRenameHistory(event, item) {
+    event.stopPropagation();
+    setRenameDraft(item.title || '');
+    setModal({ kind: 'rename', item, title: '重新命名紀錄', confirmText: '儲存', cancelText: '取消' });
+  }
+
+  async function renameHistory(item) {
+    const nextTitle = renameDraft.trim();
+    if (!nextTitle) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/history/${system.api}/${item.id}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ title: nextTitle })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setModal({ title: '重新命名失敗', message: data.error || '目前無法更新這筆紀錄名稱。' });
+        return;
+      }
+      setHistory((current) => current.map((entry) => entry.id === item.id ? data.history : entry));
+      if (selectedHistoryId === item.id) setResult((current) => current ? { ...current, title: data.history.title } : current);
+      closeModal();
+    } catch (error) {
+      console.error('rename history failed', error);
+      setModal({ title: '重新命名失敗', message: '目前無法更新這筆紀錄名稱。' });
+    }
+  }
+
+  function requestDeleteHistory(event, item) {
+    event.stopPropagation();
+    setModal({
+      kind: 'delete',
+      item,
+      title: '刪除紀錄',
+      message: `確定要刪除「${item.title || '未命名紀錄'}」嗎？`,
+      confirmText: '刪除',
+      cancelText: '取消',
+      type: 'danger'
+    });
+  }
+
+  async function deleteHistory(item) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/history/${system.api}/${item.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        setModal({ title: '刪除失敗', message: data.error || '目前無法刪除這筆紀錄。' });
+        return;
+      }
+      setHistory((current) => current.filter((entry) => entry.id !== item.id));
+      if (selectedHistoryId === item.id) {
+        setSelectedHistoryId(null);
+        setResult(null);
+      }
+      await loadFavorites();
+      closeModal();
+    } catch (error) {
+      console.error('delete history failed', error);
+      setModal({ title: '刪除失敗', message: '目前無法刪除這筆紀錄。' });
+    }
+  }
+
   function renderResult(currentResult = result) {
     if (!currentResult) return <div style={emptyState}>選擇左側紀錄後，右側會展開完整命盤。</div>;
     return (
@@ -354,7 +462,7 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
                   <Input label="姓名" value={form.name} onChange={(value) => updateField('name', value)} placeholder="輸入姓名" />
                   <label style={fieldLabel}>性別<select style={inputStyle} value={form.gender} onChange={(event) => updateField('gender', event.target.value)}><option>女</option><option>男</option><option>其他</option></select></label>
                   <Input label="出生日期" value={form.birthDate} onChange={(value) => updateField('birthDate', value)} placeholder="年/月/日" />
-                  <Input label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="HH : MM" />
+                  <Input label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="時 : 分" />
                   <label style={{ ...fieldLabel, gridColumn: '1 / -1' }}>出生地（選填）<input style={inputStyle} value={form.birthPlace} onChange={(event) => updateField('birthPlace', event.target.value)} placeholder="輸入城市或國家" /></label>
                   <label style={{ ...fieldLabel, gridColumn: '1 / -1' }}>想問的方向<textarea style={{ ...inputStyle, minHeight: 92, resize: 'none' }} maxLength={120} value={form.question} onChange={(event) => updateField('question', event.target.value)} placeholder="感情、事業、流年、人生方向..." /></label>
                   <motion.button style={astroSubmitButton} whileHover={{ y: -2, filter: 'brightness(1.08)', boxShadow: `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 34px ${system.accentGlow}` }} whileTap={{ scale: 0.98 }}>
@@ -374,7 +482,7 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
                   <Input label="姓名" value={form.name} onChange={(value) => updateField('name', value)} placeholder="輸入姓名" />
                   <label style={fieldLabel}>性別<select style={inputStyle} value={form.gender} onChange={(event) => updateField('gender', event.target.value)}><option>女</option><option>男</option><option>其他</option></select></label>
                   <Input label="出生日期" value={form.birthDate} onChange={(value) => updateField('birthDate', value)} placeholder="年/月/日" />
-                  <Input label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="HH : MM" />
+                  <Input label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="時 : 分" />
                   <Input label="出生地（選填）" value={form.birthPlace} onChange={(value) => updateField('birthPlace', value)} placeholder="城市或國家" />
                   <label style={{ ...fieldLabel, gridColumn: '1 / -1' }}>想問的方向<textarea style={{ ...inputStyle, minHeight: 96, resize: 'vertical' }} value={form.question} onChange={(event) => updateField('question', event.target.value)} placeholder="感情、事業、流年、人生方向..." /></label>
                 </div>
@@ -410,10 +518,18 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
                   style={historySearchInput(system)}
                 />
                 {filteredHistory.length === 0 ? <div style={emptyState}>尚未留下紀錄。完成一次推演後，這裡會自動保存。</div> : filteredHistory.map((item) => (
-                  <button key={item.id} style={historyItem(system, selectedHistory?.id === item.id)} onClick={() => openHistory(item)}>
-                    <span><b>{item.title}</b><small>{item.date}</small></span>
-                    {item.isFavorite && <Heart size={16} fill={system.accent} color={system.accent} />}
-                  </button>
+                  <div key={item.id} style={historyItem(system, selectedHistory?.id === item.id)} onClick={() => openHistory(item)}>
+                    <span><b>{item.title || '未命名標題'}</b><small>{item.date}</small></span>
+                    <span style={historyActionGroup}>
+                      <button type="button" style={historyIconButton(system)} onClick={(event) => requestRenameHistory(event, item)} title="重新命名">
+                        <Pencil size={15} />
+                      </button>
+                      <button type="button" style={historyIconButton(system)} onClick={(event) => requestDeleteHistory(event, item)} title="刪除">
+                        <Trash2 size={15} />
+                      </button>
+                      {item.isFavorite && <Heart size={16} fill={system.accent} color={system.accent} />}
+                    </span>
+                  </div>
                 ))}
               </aside>
               <main style={historyContent(system)}>
@@ -424,7 +540,34 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
         </AnimatePresence>
       </div>
       <style>{toolCSS(system)}</style>
-      {modal && <MysticModal isOpen={Boolean(modal)} title={modal.title} message={modal.message} confirmText="我知道了" cancelText={null} onClose={() => setModal(null)} onConfirm={() => setModal(null)} />}
+      {modal && (
+        <MysticModal
+          isOpen={Boolean(modal)}
+          title={modal.title}
+          message={modal.message}
+          confirmText={modal.confirmText || '我知道了'}
+          cancelText={modal.cancelText ?? null}
+          type={modal.type || 'info'}
+          onClose={closeModal}
+          onConfirm={() => {
+            if (modal.kind === 'rename') return renameHistory(modal.item);
+            if (modal.kind === 'delete') return deleteHistory(modal.item);
+            return closeModal();
+          }}
+        >
+          {modal.kind === 'rename' && (
+            <label style={renameModalLabel}>
+              <span>新的紀錄名稱</span>
+              <input
+                value={renameDraft}
+                onChange={(event) => setRenameDraft(event.target.value)}
+                style={renameModalInput(system)}
+                autoFocus
+              />
+            </label>
+          )}
+        </MysticModal>
+      )}
     </section>
   );
 }
@@ -445,10 +588,37 @@ function ResultView({ systemKey, system, result, favorites, showPromptMenu, setS
           )}
         </div>
       </div>
-      {systemKey === 'ziwei' && <ZiWeiResult data={result.data} system={system} />}
-      {systemKey === 'bazi' && <BaZiResult data={result.data} system={system} />}
-      {systemKey === 'astrology' && <AstrologyResult data={result.data} system={system} />}
-      {result.report && <pre style={reportBox(system)}>{result.report}</pre>}
+      {systemKey === 'ziwei' && (
+        <ZiWeiResult
+          data={result.data}
+          system={system}
+          form={result.form}
+          report={result.report}
+          copyPrompt={copyPrompt}
+          runAiReading={runAiReading}
+          isAiReading={isAiReading}
+          isFavorite={favorites.some((item) => item.historyId === result.id)}
+          toggleFavorite={toggleFavorite}
+          aiTargets={AI_TARGETS}
+        />
+      )}
+      {systemKey === 'bazi' && (
+        <BaZiResult
+          data={result.data}
+          system={system}
+          form={result.form}
+          report={result.report}
+          copyPrompt={copyPrompt}
+          runAiReading={runAiReading}
+          isAiReading={isAiReading}
+          isFavorite={favorites.some((item) => item.historyId === result.id)}
+          toggleFavorite={toggleFavorite}
+          aiTargets={AI_TARGETS}
+        />
+      )}
+      {systemKey === 'astrology' && <AstrologyResult data={result.data} system={system} form={result.form}  />}
+  
+      {result.report && !['ziwei', 'bazi'].includes(systemKey) && <pre style={reportBox(system)}>{result.report}</pre>}
     </>
   );
 }
@@ -544,6 +714,11 @@ function AstrologyRiteForm({ system, form, updateField, submitChart }) {
       onSubmit={submitChart}
     >
       <ChartParticleField systemKey="astrology" />
+      <img
+        src="/assets/astrology/astrologyBackground.png"
+        alt=""
+        style={astrologyBgImage}
+      />
       <div style={astrologyRiteIntro}>
         推演十二宮，洞悉你的人生藍圖
       </div>
@@ -567,7 +742,7 @@ function AstrologyRiteForm({ system, form, updateField, submitChart }) {
         <AstrologyRiteInput icon={<CalendarDays size={24} />} label="出生日期" value={form.birthDate} onChange={(value) => updateField('birthDate', value)} placeholder="年/月/日" />
       </div>
       <div style={{ ...astrologyFieldSlot, right: '12%', top: '35.5%' }}>
-        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="HH : MM" />
+        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(value) => updateField('birthTime', value)} placeholder="時 : 分" />
       </div>
       <div style={{ ...astrologyFieldSlot, left: '15.5%', top: '55%' }}>
         <AstrologyRiteSelect icon={<VenusAndMars size={25} />} label="性別" value={form.gender} onChange={(value) => updateField('gender', value)} />
@@ -580,6 +755,7 @@ function AstrologyRiteForm({ system, form, updateField, submitChart }) {
         type="submit"
         className="astrology-rite-button"
         style={astrologyRiteButton}
+        x="-50%" 
         whileHover={{ y: -2, filter: 'brightness(1.1)', boxShadow: `0 0 34px ${system.accentGlow}, inset 0 1px 0 rgba(255,255,255,0.16)` }}
         whileTap={{ scale: 0.95 }}
       >
@@ -619,7 +795,7 @@ function ZiweiRiteForm({ system, form, updateField, submitChart }) {
         <AstrologyRiteInput icon={<CalendarDays size={24} />} label="出生日期" value={form.birthDate} onChange={(v) => updateField('birthDate', v)} placeholder="年/月/日" />
       </div>
       <div style={{ ...ziweiFieldSlot, right: '9.5%', top: '36.8%' }}>
-        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(v) => updateField('birthTime', v)} placeholder="HH : MM" />
+        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(v) => updateField('birthTime', v)} placeholder="時 : 分" />
       </div>
       <div style={{ ...ziweiFieldSlot, left: '14%', top: '58.7%' }}>
         <AstrologyRiteSelect icon={<VenusAndMars size={25} />} label="性別" value={form.gender} onChange={(v) => updateField('gender', v)} />
@@ -631,6 +807,7 @@ function ZiweiRiteForm({ system, form, updateField, submitChart }) {
       <motion.button
         type="submit"
         style={ziweiRiteButton}
+        x="-50%"  
         whileHover={{ y: -2, filter: 'brightness(1.1)', boxShadow: '0 0 34px rgba(0,204,255,0.42), inset 0 1px 0 rgba(255,255,255,0.16)' }}
         whileTap={{ scale: 0.98 }}
       >
@@ -673,7 +850,7 @@ function BaziRiteForm({ system, form, updateField, submitChart }) {
       </div>
 
       <div style={{ ...baziFieldSlot, right: '12.2%', top: '34.5%' }}>
-        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(v) => updateField('birthTime', v)} placeholder="HH : MM" />
+        <AstrologyRiteInput icon={<Clock size={24} />} label="出生時間（選填）" value={form.birthTime} onChange={(v) => updateField('birthTime', v)} placeholder="時 : 分" />
       </div>
 
       <div style={{ ...baziFieldSlot, left: '7%', top: '50%' }}>
@@ -687,6 +864,7 @@ function BaziRiteForm({ system, form, updateField, submitChart }) {
       <motion.button
         type="submit"
         style={baziRiteButton}
+        x="-50%"
         whileHover={{
           y: -2,
           filter: 'brightness(1.2)',
@@ -813,19 +991,6 @@ function AstroLoading() {
   return <div className="astro-wheel-loading">{SIGNS.map((sign, index) => <span key={sign} style={{ '--i': index }}>{sign}</span>)}</div>;
 }
 
-function ZiWeiResult({ data, system }) {
-  const [flow, setFlow] = useState('流年');
-  return <div><div style={segmented(system)}>{['流年', '流月', '流日'].map((item) => <button key={item} className={flow === item ? 'active' : ''} onClick={() => setFlow(item)}>{item}</button>)}</div><div style={ziweiGrid}>{data.palaces.map((palace) => <div key={palace.palace} style={palaceCell(system)}><b>{palace.palace}</b><span>{palace.main}</span><small>{palace.aux} · {palace.stem}{palace.branch}</small><em>{flow} {palace.decade}</em></div>)}</div></div>;
-}
-
-function BaZiResult({ data, system }) {
-  return <div style={{ display: 'grid', gap: 18 }}><div style={infoGrid}>{data.info.map(([label, value]) => <div key={label} style={infoCell(system)}><small>{label}</small><b>{value}</b></div>)}</div><table style={tableStyle}><thead><tr><th>乾造</th>{data.pillars.map((pillar) => <th key={pillar.name}>{pillar.name}</th>)}</tr></thead><tbody><tr><th>主星</th>{data.pillars.map((pillar) => <td key={pillar.name}>{pillar.god}</td>)}</tr><tr><th>天干</th>{data.pillars.map((pillar) => <td key={pillar.name}><b>{pillar.stem}</b></td>)}</tr><tr><th>地支</th>{data.pillars.map((pillar) => <td key={pillar.name}><b>{pillar.branch}</b></td>)}</tr><tr><th>藏干</th>{data.pillars.map((pillar) => <td key={pillar.name}>{pillar.hidden}</td>)}</tr><tr><th>地勢</th>{data.pillars.map((pillar) => <td key={pillar.name}>{pillar.phase}</td>)}</tr></tbody></table><div style={luckGrid}>{data.luck.map((luck) => <div key={luck.age} style={infoCell(system)}><small>{luck.age}歲</small><b>{luck.stem}{luck.branch}</b><span>{luck.note}</span></div>)}</div></div>;
-}
-
-function AstrologyResult({ data }) {
-  return <div style={astroWrap}><div className="astro-result-wheel">{SIGNS.map((sign, index) => <span key={sign} style={{ '--i': index }}>{sign}</span>)}</div><table style={tableStyle}><thead><tr><th>行星</th><th>星座</th><th>度數</th><th>宮位</th><th>相位</th></tr></thead><tbody>{data.planets.map((planet) => <tr key={planet.planet}><td>{planet.planet}</td><td>{planet.sign}</td><td>{planet.degree}</td><td>{planet.house}</td><td>{planet.aspect}</td></tr>)}</tbody></table></div>;
-}
-
 const shell = (system, view, systemKey) => ({
   width: view === 'history' ? 'calc(100vw - 80px)' : (CELESTIAL_SYSTEMS.has(systemKey) ? '100%' : 'min(1260px, 94vw)'),
   margin: view === 'history' ? '16px 40px 0' : '0 auto',
@@ -854,9 +1019,9 @@ const chartParticleCanvas = {
   inset: 0,
   width: '100%',
   height: '100%',
-  zIndex: 0,
+  zIndex: 1,
   pointerEvents: 'none',
-  opacity: 0.88,
+  opacity: 0.72,
   mixBlendMode: 'screen'
 };
 const astrologyRiteIntro = {
@@ -916,6 +1081,19 @@ const baziFieldSlot = {
   zIndex: 5,
   width: 'min(360px, 26vw)'
 };
+const astrologyBgImage = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  objectPosition: 'center',
+  zIndex: 0,
+  pointerEvents: 'none',
+  opacity: 0.72,
+  mixBlendMode: 'screen',
+  filter: 'saturate(1.18) brightness(1.02) contrast(1.06)'
+};
 const astrologyInputLabel = {
   display: 'grid',
   gap: '10px',
@@ -928,7 +1106,7 @@ const astrologyInputShell = {
   position: 'relative',
   display: 'flex',
   alignItems: 'center',
-  height: 60,
+  height: 52,
   borderRadius: 999,
   border: 'none',
   background: 'rgba(0, 10, 8, 0.45)',
@@ -937,7 +1115,7 @@ const astrologyInputShell = {
 };
 const astrologyFrameImage = {
   position: 'absolute',
-  inset: '-20px -34px',
+  inset: '-15px -30px',
   width: 'calc(100% + 68px)',
   height: 'calc(100% + 40px)',
   objectFit: 'fill',
@@ -983,9 +1161,8 @@ const astrologyInputCount = {
 };
 const astrologyRiteButton = {
   position: 'absolute',
-  left: '50%',
+  left: '39%',
   bottom: '80px',
-  transform: 'translateX(-50%)',
   zIndex: 6,
   width: 'min(330px, 25vw)',
   height: 45,
@@ -1238,8 +1415,7 @@ const ziweiPlateGlow = {
 const ziweiRiteButton = {
   position: 'absolute',
   left: '39%',
-  bottom: '58px',
-  transform: 'translateX(-50%)',
+  bottom: '65px',
   zIndex: 6,
   width: 'min(320px, 25vw)',
   height: 50,
@@ -1291,9 +1467,8 @@ const baziPlateGlow = {
 
 const baziRiteButton = {
   position: 'absolute',
-  left: '39%',
+  left: '39.5%',
   bottom: '70px',
-  transform: 'translateX(-50%)',
   zIndex: 6,
   width: 'min(320px, 25vw)',
   height: 50,
@@ -1331,9 +1506,34 @@ const historyContent = (system) => ({ minHeight: 0, padding: 40, borderRadius: 8
 const sidebarTitle = (system) => ({ color: system.accent, letterSpacing: '0.32em', fontSize: '0.78rem', padding: '2px 4px 12px', textTransform: 'uppercase' });
 const historySearchInput = (system) => ({ width: '100%', boxSizing: 'border-box', height: 44, borderRadius: 6, border: `1px solid ${system.accentSoft}`, background: 'rgba(255,255,255,0.045)', color: '#fff', padding: '0 14px', outline: 'none', letterSpacing: '0.08em' });
 const historyItem = (system, active) => ({ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center', padding: '14px 16px', borderRadius: 6, border: `1px solid ${active ? system.accent : system.accentSoft}`, background: active ? system.accentSoft : 'rgba(0,0,0,0.24)', color: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'background 180ms ease, border-color 180ms ease, transform 180ms ease' });
+const historyActionGroup = { display: 'inline-flex', alignItems: 'center', gap: 8 };
+const historyIconButton = (system) => ({
+  width: 26,
+  height: 26,
+  display: 'grid',
+  placeItems: 'center',
+  border: 'none',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'rgba(255,255,255,0.46)',
+  cursor: 'pointer',
+  transition: 'color 160ms ease, filter 160ms ease, transform 160ms ease, background 160ms ease'
+});
 const historyEmptyCenter = { minHeight: 560, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.36)', letterSpacing: '0.22em' };
 const emptyState = { padding: '80px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.58)' };
 const reportBox = (system) => ({ whiteSpace: 'pre-wrap', marginTop: 18, padding: 16, borderRadius: 6, border: `1px solid ${system.accentSoft}`, background: 'rgba(0,0,0,0.32)', color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 });
+const renameModalLabel = { display: 'grid', gap: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.86rem', letterSpacing: '0.08em' };
+const renameModalInput = (system) => ({
+  width: '100%',
+  boxSizing: 'border-box',
+  height: 42,
+  borderRadius: 5,
+  border: `1px solid ${system.accentSoft}`,
+  background: 'rgba(255,255,255,0.045)',
+  color: '#fff',
+  padding: '0 12px',
+  outline: 'none'
+});
 
 const toolCSS = (system) => `
   .mystic-chart-tool button { font-family: inherit; }
@@ -1388,13 +1588,13 @@ const toolCSS = (system) => `
   }
   .astrology-rite-select-control [role="listbox"] button {
     width: 100%;
-    min-height: 36px;
+    min-height: 30px;
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
     border: 1px solid transparent;
     border-radius: 7px;
-    padding: 8px 11px;
+    padding: 5px 10px;
     background: transparent;
     color: rgba(255,255,255,0.82);
     cursor: pointer;
@@ -1458,6 +1658,18 @@ const toolCSS = (system) => `
       0 0 0 1px rgba(255,204,0,0.82),
       0 0 30px rgba(255,204,0,0.42),
       inset 0 0 22px rgba(255,204,0,0.18);
+  }
+  .bazi-rite-form .astrology-rite-select-control [role="listbox"] {
+  border: 1px solid rgba(255,204,0,0.62) !important;
+  background: linear-gradient(180deg, rgba(30,20,4,0.98), rgba(10,8,2,0.98)) !important;
+  box-shadow: 0 18px 36px rgba(0,0,0,0.52), inset 0 0 20px rgba(255,204,0,0.07) !important;
+}
+  .bazi-rite-form .astrology-rite-select-control [role="listbox"] button:hover,
+  .bazi-rite-form .astrology-rite-select-control [role="listbox"] button.selected {
+    border-color: rgba(255,204,0,0.48) !important;
+    background: rgba(255,204,0,0.14) !important;
+    color: #fff2c8 !important;
+    box-shadow: inset 0 0 16px rgba(255,204,0,0.09) !important;
   }
   .mystic-result-panel::before {
     content: '';

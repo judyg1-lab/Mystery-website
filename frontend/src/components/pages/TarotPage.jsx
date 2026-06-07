@@ -198,112 +198,199 @@ const parseTarotHistoryContent = (content = '') => {
 const formatArchiveTitle = (title = '') => title.replace(/([:：])\s*/, '$1\n');
 
 const TarotCardVisual = ({ item, entry }) => (
-  <div style={tarotCardShell}>
-    <div style={tarotImageFrame}>
+  <div style={{ ...tarotCardShell, maxWidth: '180px' }}>
+    <div style={{
+      ...tarotImageFrame,
+      aspectRatio: '4 / 6',
+      maxHeight: '280px',
+      marginTop: '30px'
+    }}>
       <img
         src={entry?.card?.imageUrl ? getAssetUrl(entry.card.imageUrl) : TAROT_CARD_BACK_URL}
         alt={entry?.card?.title || entry?.name || ''}
-        style={tarotCardImage}
+        style={{
+          ...tarotCardImage,
+          objectFit: 'cover',
+          objectPosition: 'center top'
+        }}
         onError={(event) => {
           event.currentTarget.src = TAROT_CARD_BACK_URL;
         }}
       />
     </div>
-    <div style={tarotCardCaption}>
-      <div style={tarotCardTop}>THOTH</div>
-      <div style={tarotCardMeta}>{entry?.orbit || item?.category || 'MYSTIC CODEX'}</div>
-    </div>
   </div>
 );
 
-const TarotHistoryReport = ({ record, reading, cards, onCardOpen }) => {
+const CHINESE_SUBTITLES = {
+  'Past': '過去 / 根基', 'Present': '現在 / 能量', 'Future': '未來 / 結果',
+  'Self': '自我狀態', 'Other': '對方狀態', 'Core': '關係核心',
+  'Obstacle': '當前阻力', 'Outcome': '未來走向',
+  'Position 1': '過去 / 根基', 'Position 2': '現在 / 能量', 'Position 3': '未來 / 結果',
+  'Position 4': '第四張牌', 'Position 5': '第五張牌',
+};
+
+const CHINESE_CARD_THEMES = {
+  'The Tower': '突如其來的覺醒 / 崩解 / 重建',
+  'Strength': '力量 / 忍耐 / 內在穩定',
+  'The Sun': '勝利 / 清明 / 豐盛的能量',
+  'The Moon': '直覺 / 潛意識 / 隱藏真相',
+  'The Star': '希望 / 療癒 / 靈魂引導',
+  'The World': '完成 / 整合 / 新的循環',
+  'The Fool': '嶄新開始 / 純粹的躍進',
+  'The Magus': '意志力 / 魔法顯化 / 行動',
+  'Fortune': '命運轉輪 / 時機 / 循環',
+  'Adjustment': '業力平衡 / 正義 / 因果',
+  'Death': '蛻變 / 終結 / 新生的門扉',
+  'The Hermit': '內省 / 孤獨的智慧 / 引導之光',
+};
+
+const CHINESE_MEANINGS = [
+  '這張牌揭示了核心能量的流動方向。過去積累的一切正在形塑此刻的格局，請以清明之心觀察內在的訊息，讓直覺引導你做出真正符合本心的決定。',
+  '當前局面正在醞釀深刻的轉化契機。你所感受到的緊張與張力，正是突破前必然經歷的摩擦期。放鬆掌控，讓能量自然流動，結果將超越你目前的預期。',
+  '未來的方向已在星圖中浮現輪廓。保持清醒與耐心，以具體的行動步驟印證內心的選擇。你擁有打破舊有框架、重建更真實生活的力量與勇氣。',
+  '這張牌提醒你回歸內在的平靜。真正的力量不來自外在的掌控，而是對自身節奏的深度信任。此刻最需要的，是給自己空間，讓事物自然展開落定。',
+  '能量正在匯聚，等待最終的顯化與落地。你已種下的種子正在地下生根，雖然看不見，卻真實存在。相信這個過程，繼續以誠意灌溉你的目標與方向。',
+];
+
+function TarotHistoryReport({ record, reading, cards, onCardOpen }) {
   const spreadName = reading?.spread?.name || record?.title || 'Tarot Reading';
   const dateText = record?.date || '';
-  const soulMaster = reading?.soulMaster || '未記錄主牌';
-  const question = reading?.question || record?.title || '未填寫';
+  const soulMaster = reading?.soulMaster || '─';
+  const question = reading?.question || '';
+  const displayTitle = (question && question !== '未填寫') ? question : '本次塔羅占卜';
   const displayedCards = cards.length ? cards : [];
 
   return (
-    <article style={tarotHistoryReport}>
-      <div style={tarotHistoryFrameGlow} />
-      <header style={tarotHistoryHeader}>
-        <div>
-          <div style={tarotHistoryKicker}>REPORT - {dateText}</div>
-          <h1 style={tarotHistoryTitle}>{spreadName}</h1>
-          <div style={tarotHistoryMetaRow}>
-            <span>主牌：{soulMaster}</span>
-            <span>問題：{question}</span>
+    <article style={thReport}>
+      <div style={thFrameGlow} />
+
+      {/* Header */}
+      <header style={thHeader}>
+        <div style={{ flex: 1 }}>
+          <div style={thKicker}>
+            <span>🕐 {dateText}</span>
+            {soulMaster !== '─' && <><span style={thKickerDot}>·</span><span>主牌：{soulMaster}</span></>}
+            <span style={thKickerDot}>·</span>
+            <span>牌陣：{spreadName}</span>
           </div>
+          <h1 style={thTitle}>{displayTitle}</h1>
         </div>
-        <Heart size={26} color="#d4af37" style={tarotHistoryHeart} />
+        <motion.div
+          style={thHeartBtn}
+          whileHover={{ scale: 1.12, filter: 'drop-shadow(0 0 10px rgba(188,19,254,0.7))' }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Heart size={18} color="#bc13fe" />
+        </motion.div>
       </header>
 
-      <div style={tarotHistoryGrid}>
-        <section style={tarotHistorySpreadPanel}>
-          <div style={tarotHistorySectionTitle}><span />THE SPREAD<span /></div>
-          <div style={tarotHistoryCardRow}>
+      {/* Body grid */}
+      <div style={thGrid}>
+
+        {/* Left: THE SPREAD */}
+        <section style={thSpreadPanel}>
+          <div style={thSectionTitle}>
+            <span style={thOrnLine} />
+            <span>THE SPREAD · 牌陣展開</span>
+            <span style={thOrnLine} />
+          </div>
+
+          <div style={thCardRow}>
             {displayedCards.map((card, index) => {
               const imageUrl = card.imageUrl || card.card?.imageUrl || '';
+              const posLabel = CHINESE_SUBTITLES[card.subtitle] || card.subtitle || `位置 ${card.position || index + 1}`;
               return (
-                <button
-                  key={`${card.position}-${card.name}-${index}`}
+                <motion.button
+                  key={`card-${index}`}
                   type="button"
-                  style={tarotHistoryCardButton}
+                  style={thCardBtn}
                   onClick={() => onCardOpen?.({
                     name: card.name,
                     card: card.card,
-                    meaning: card.meaning,
-                    orbit: card.subtitle || `POSITION ${card.position}`
+                    meaning: card.meaning || CHINESE_MEANINGS[index % CHINESE_MEANINGS.length],
+                    orbit: posLabel
                   })}
+                  whileHover={{ y: -6, filter: 'drop-shadow(0 0 14px rgba(188,19,254,0.5))' }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <span style={tarotHistoryPositionBadge}>{card.position || index + 1}</span>
+                  <span style={thPositionBadge}>{card.position || index + 1}</span>
                   <img
                     src={imageUrl ? getAssetUrl(imageUrl) : TAROT_CARD_BACK_URL}
                     alt={card.name}
-                    style={tarotHistoryCardImage}
-                    onError={(event) => {
-                      event.currentTarget.src = TAROT_CARD_BACK_URL;
-                    }}
+                    style={thCardImage}
+                    onError={(e) => { e.currentTarget.src = TAROT_CARD_BACK_URL; }}
                   />
-                  <strong>{card.name}</strong>
-                  <small>{card.subtitle || `Position ${card.position || index + 1}`}</small>
-                </button>
+                  <strong style={{ color: '#f5ead8', fontSize: '0.78rem', letterSpacing: '0.06em', fontFamily: 'Cinzel', marginTop: '2px' }}>
+                    {card.name}
+                  </strong>
+                  <small style={{ color: '#bc13fe', fontSize: '0.68rem', letterSpacing: '0.04em', fontFamily: "'Noto Serif TC',serif" }}>
+                    {posLabel}
+                  </small>
+                </motion.button>
               );
             })}
           </div>
-          <div style={tarotHistoryOracle}>
-            <b>FINAL ORACLE</b>
-            <p>{question}</p>
+
+          {/* Final Oracle */}
+          <div style={thOracle}>
+            <div style={{ color: '#d4af37', letterSpacing: '0.32em', fontSize: '0.7rem', marginBottom: '8px', fontFamily: 'Cinzel' }}>
+              ✦ FINAL ORACLE · 最終指引 ✦
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.78)', fontFamily: "'Noto Serif TC',serif", fontSize: '0.86rem', lineHeight: 1.85, margin: 0, letterSpacing: '0.04em' }}>
+              {(question && question !== '未填寫')
+                ? question
+                : '這次牌陣的訊息指引你回歸當下，以清明之心看見前路。每一張牌都是一面鏡子，映照出你內在最深處的知曉與答案。相信自己的直覺，它從未離開過你。'}
+            </p>
           </div>
         </section>
 
-        <section style={tarotHistoryAnalysisPanel}>
-          <div style={tarotHistorySectionTitle}><span />CARD ANALYSIS<span /></div>
-          {displayedCards.map((card, index) => (
-            <div key={`${card.name}-analysis-${index}`} style={tarotHistoryAnalysisItem}>
-              <img
-                src={(card.imageUrl || card.card?.imageUrl) ? getAssetUrl(card.imageUrl || card.card?.imageUrl) : TAROT_CARD_BACK_URL}
-                alt={card.name}
-                style={tarotHistoryAnalysisImage}
-                onError={(event) => {
-                  event.currentTarget.src = TAROT_CARD_BACK_URL;
-                }}
-              />
-              <div>
-                <div style={tarotHistoryAnalysisTitle}>
-                  <span>{card.position || index + 1}</span>
-                  <h3>{card.name}</h3>
+        {/* Right: CARD ANALYSIS */}
+        <section style={thAnalysisPanel}>
+          <div style={thSectionTitle}>
+            <span style={thOrnLine} />
+            <span>牌義解析 ANALYSIS</span>
+            <span style={thOrnLine} />
+          </div>
+
+          {displayedCards.map((card, index) => {
+            const imgUrl = (card.imageUrl || card.card?.imageUrl)
+              ? getAssetUrl(card.imageUrl || card.card?.imageUrl)
+              : TAROT_CARD_BACK_URL;
+            const posLabel = CHINESE_SUBTITLES[card.subtitle] || card.subtitle || '';
+            const cardTheme = CHINESE_CARD_THEMES[card.name] || posLabel || '牌義 / 解析 / 象徵';
+            const meaning = card.meaning || CHINESE_MEANINGS[index % CHINESE_MEANINGS.length];
+
+            return (
+              <motion.div
+                key={`analysis-${index}`}
+                style={thAnalysisItem}
+                whileHover={{ background: 'rgba(188,19,254,0.07)', borderColor: 'rgba(188,19,254,0.3)' }}
+                transition={{ duration: 0.18 }}
+              >
+                <img src={imgUrl} alt={card.name} style={thAnalysisImg}
+                  onError={(e) => { e.currentTarget.src = TAROT_CARD_BACK_URL; }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={thAnalysisHead}>
+                    <span style={thAnalysisNum}>{card.position || index + 1}</span>
+                    <h3 style={{ margin: 0, color: '#f5ead8', fontSize: '0.92rem', letterSpacing: '0.08em', fontFamily: 'Cinzel' }}>
+                      {card.name}
+                    </h3>
+                  </div>
+                  <b style={{ display: 'block', color: '#bc13fe', fontSize: '0.75rem', margin: '4px 0 6px', letterSpacing: '0.06em', fontFamily: "'Noto Serif TC',serif" }}>
+                    {cardTheme}
+                  </b>
+                  <p style={{ color: 'rgba(255,255,255,0.72)', fontFamily: "'Noto Serif TC',serif", fontSize: '0.82rem', lineHeight: 1.78, margin: 0, letterSpacing: '0.03em' }}>
+                    {meaning}
+                  </p>
                 </div>
-                {card.subtitle && <b style={tarotHistoryAnalysisSubtitle}>{card.subtitle}</b>}
-                <p>{card.meaning || '這張牌保留直覺解讀空間，請依照當下問題與主牌脈絡延伸。'}</p>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            );
+          })}
         </section>
       </div>
     </article>
   );
-};
+}
 
 const TarotCardDetailOverlay = ({ entry, onClose }) => {
   const title = entry?.card?.title || entry?.name || 'THOTH ARCANA';
@@ -1223,6 +1310,98 @@ const detailWrapper = {
   borderRadius: '8px', padding: '0px 50px', border: '1px solid rgba(188,19,254,0.14)',
   backdropFilter: 'blur(1px)', boxShadow: 'inset 0 0 28px rgba(188,19,254,0.08)'
 };
+// 新的 th* 樣式（替換原本的 tarotHistory* 系列）
+const thReport = {
+  position: 'relative', padding: '28px 30px',
+  border: '1px solid rgba(212,175,55,0.22)', borderRadius: '8px',
+  background: ['radial-gradient(circle at 28% 42%, rgba(188,19,254,0.1), transparent 34%)',
+    'radial-gradient(circle at 78% 24%, rgba(212,175,55,0.08), transparent 28%)', 'rgba(4,1,8,0.55)'].join(', '),
+  boxShadow: 'inset 0 0 44px rgba(212,175,55,0.04), 0 0 30px rgba(188,19,254,0.1)', overflow: 'hidden'
+};
+const thFrameGlow = {
+  position: 'absolute', inset: '12px',
+  border: '1px solid rgba(212,175,55,0.1)', borderRadius: '6px', pointerEvents: 'none',
+  boxShadow: 'inset 0 0 28px rgba(188,19,254,0.06)'
+};
+const thHeader = {
+  position: 'relative', zIndex: 1,
+  display: 'flex', justifyContent: 'space-between', gap: '24px', alignItems: 'flex-start',
+  padding: '0 6px 20px', borderBottom: '1px solid rgba(212,175,55,0.14)'
+};
+const thKicker = {
+  display: 'flex', flexWrap: 'wrap', gap: '6px 0',
+  color: '#d4af37', letterSpacing: '0.36em', fontSize: '0.68rem', marginBottom: '10px', alignItems: 'center'
+};
+const thKickerDot = { color: 'rgba(212,175,55,0.35)', margin: '0 8px' };
+const thTitle = {
+  margin: 0, color: '#f5ead8', fontFamily: 'Cinzel, serif',
+  fontSize: 'clamp(1.6rem, 2.6vw, 3rem)', letterSpacing: '0.1em', lineHeight: 1.05
+};
+const thHeartBtn = {
+  flex: '0 0 auto', width: '34px', height: '34px', borderRadius: '50%',
+  border: '1px solid rgba(188,19,254,0.36)', background: 'rgba(7,3,10,0.72)',
+  display: 'grid', placeItems: 'center', cursor: 'pointer'
+};
+const thGrid = {
+  position: 'relative', zIndex: 1,
+  display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 0.82fr)',
+  gap: '22px', paddingTop: '22px'
+};
+const thSpreadPanel = { minWidth: 0, display: 'grid', alignContent: 'start', gap: '20px' };
+const thSectionTitle = {
+  display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
+  gap: '10px', color: '#d4af37', letterSpacing: '0.28em', fontSize: '0.72rem', textAlign: 'center'
+};
+const thOrnLine = {
+  height: '1px',
+  background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.45), transparent)',
+  display: 'block'
+};
+const thCardRow = {
+  display: 'flex', justifyContent: 'center', alignItems: 'flex-start', flexWrap: 'wrap', gap: '28px', paddingTop: '8px'
+};
+const thCardBtn = {
+  position: 'relative', width: '100px', display: 'grid', justifyItems: 'center',
+  gap: '6px', padding: '0 0 4px', border: 0, background: 'transparent',
+  color: '#d4af37', cursor: 'pointer', fontFamily: 'Cinzel, serif', textAlign: 'center'
+};
+const thPositionBadge = {
+  position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)',
+  width: '26px', height: '26px', display: 'grid', placeItems: 'center',
+  borderRadius: '50%', border: '1px solid rgba(212,175,55,0.5)',
+  background: 'rgba(7,3,10,0.94)', color: '#d4af37', zIndex: 2, fontSize: '0.72rem'
+};
+const thCardImage = {
+  width: '96px', height: '160px', objectFit: 'cover', borderRadius: '6px',
+  border: '1px solid rgba(212,175,55,0.38)',
+  boxShadow: '0 0 14px rgba(212,175,55,0.12), 0 0 20px rgba(188,19,254,0.12)'
+};
+const thOracle = {
+  margin: '4px auto 0', width: 'min(560px, 100%)',
+  padding: '16px 20px', border: '1px solid rgba(212,175,55,0.2)', borderRadius: '8px',
+  background: 'rgba(0,0,0,0.22)', color: '#f5d889', textAlign: 'center'
+};
+const thAnalysisPanel = {
+  minWidth: 0, display: 'grid', alignContent: 'start', gap: '14px',
+  paddingLeft: '20px', borderLeft: '1px solid rgba(212,175,55,0.14)'
+};
+const thAnalysisItem = {
+  display: 'grid', gridTemplateColumns: '62px minmax(0, 1fr)', gap: '12px',
+  alignItems: 'start', padding: '12px 10px', borderRadius: '6px',
+  border: '1px solid rgba(212,175,55,0.08)',
+  transition: 'background 180ms ease, border-color 180ms ease'
+};
+const thAnalysisImg = {
+  width: '58px', height: '96px', objectFit: 'cover', borderRadius: '4px',
+  border: '1px solid rgba(212,175,55,0.3)'
+};
+const thAnalysisHead = {
+  display: 'flex', alignItems: 'center', gap: '8px', color: '#f5ead8', letterSpacing: '0.1em'
+};
+const thAnalysisNum = {
+  width: '20px', height: '20px', borderRadius: '50%', border: '1px solid rgba(212,175,55,0.48)',
+  display: 'grid', placeItems: 'center', color: '#d4af37', fontSize: '0.65rem', flexShrink: 0
+};
 const tarotHistoryReport = {
   position: 'relative',
   minHeight: 'calc(100vh - 170px)',
@@ -1455,7 +1634,7 @@ const tarotCardImage = { width: '100%', height: '100%', display: 'block', object
 const tarotCardCaption = { paddingTop: '14px', textAlign: 'center' };
 const tarotCardTop = { color: '#d4af37', fontSize: '0.68rem', letterSpacing: '5px', marginBottom: '8px' };
 const tarotCardName = { color: '#fff', fontSize: '0.88rem', letterSpacing: '2px', lineHeight: 1.4 };
-const tarotCardMeta = { color: 'rgba(255,255,255,0.42)', fontSize: '0.68rem', letterSpacing: '1px', lineHeight: 1.5, marginTop: '6px' };
+const tarotCardMeta = { color: 'rgba(255,255,255,0.42)', fontSize: '0.65rem', letterSpacing: '1px', lineHeight: 1.4, marginTop: '5px' };
 const cardCodexGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' };
 const tarotEntryCard = { background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(188,19,254,0.16)', borderRadius: '8px', padding: '16px', boxShadow: 'inset 0 0 18px rgba(188,19,254,0.035)', cursor: 'pointer', transition: 'background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease' };
 const entryImageFrame = { width: '100%', aspectRatio: '2 / 3', maxHeight: '220px', marginBottom: '14px', borderRadius: '7px', overflow: 'hidden', border: '1px solid rgba(212,175,55,0.2)', background: '#08040d', boxShadow: '0 12px 28px rgba(0,0,0,0.38), inset 0 0 18px rgba(188,19,254,0.08)' };
@@ -1610,9 +1789,9 @@ const archiveCardKicker = {
 
 const archiveCardCategory = {
   color: '#bc13fe',
-  fontSize: '0.78rem',
+  fontSize: '0.7rem',
   letterSpacing: '3px',
-  marginBottom: '18px'
+  marginBottom: '16px'
 };
 
 const archiveCardArchive = {

@@ -25,6 +25,7 @@
 - npm install express cors dotenv prisma @prisma/client bcrypt jsonwebtoken multer
 - npm install axios cheerio: install axios(爬蟲) and analyze HTML label(cheerio)
 - npm install -D concurrently: 它記錄到 devDependencies，讓你可以用一個指令同時執行多個程式
+- npm install html2canvas: 讓「匯出」按鈕真的能把畫面變成 JPEG 圖片下載
 
 ### tech stack
 - frontend: React.js, Next.js

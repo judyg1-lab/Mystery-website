@@ -83,7 +83,11 @@ const existingImageUrls = {
   'disks-seven-failure': '/tarot/cards/disks/failure.png',
   'disks-eight-prudence': '/tarot/cards/disks/pruduence.png',
   'disks-nine-gain': '/tarot/cards/disks/gain.png',
-  'disks-ten-wealth': '/tarot/cards/disks/wealth.png'
+  'disks-ten-wealth': '/tarot/cards/disks/wealth.png',
+  'disks-knight-knight-of-disks': '/tarot/cards/court/knight%20of%20disks.png',
+  'disks-queen-queen-of-disks': '/tarot/cards/court/queen%20of%20disks.png',
+  'disks-prince-prince-of-disks': '/tarot/cards/court/prince%20of%20disks.png',
+  'disks-princess-princess-of-disks': '/tarot/cards/court/princess%20of%20disks.png'
 };
 
 const majorArcana = [

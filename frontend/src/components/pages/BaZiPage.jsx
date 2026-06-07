@@ -74,6 +74,7 @@ export default function BaZiPage() {
   const hasHandledProfileJump = useRef(false);
 
   const [activeTab, setActiveTab] = useState('origins');
+  const [divinationResetKey, setDivinationResetKey] = useState(0);
   const [drawingView, setDrawingView] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [hasDrawnMaster] = useState(false);
@@ -291,9 +292,9 @@ export default function BaZiPage() {
   };
 
   return (
-    <div style={mainLayout}>
+    <div style={{ ...mainLayout, ...(activeTab === 'drawing' ? baziDrawingBackdrop : null) }}>
       <style>{hideScrollbarCSS}</style>
-      <UniverseCanvas />
+      {activeTab !== 'drawing' && <UniverseCanvas />}
       <MysticModal
         isOpen={modalConfig.isOpen}
         onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
@@ -319,7 +320,7 @@ export default function BaZiPage() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); resetSelection(); }}
+              onClick={() => { setActiveTab(tab.key); resetSelection(); if (tab.key === 'drawing') setDivinationResetKey((key) => key + 1); }}
               style={activeTab === tab.key ? activeTabBtn : tabBtn}
               onMouseEnter={(e) => {
                 if (activeTab !== tab.key) {
@@ -451,7 +452,7 @@ export default function BaZiPage() {
         )}
 
         {(activeTab === 'drawing' || activeTab === 'history') && (
-          <MysticChartTool systemKey="bazi" view={activeTab === 'history' ? 'history' : 'drawing'} targetHistoryId={location.state?.targetHistoryId} />
+          <MysticChartTool systemKey="bazi" view={activeTab === 'history' ? 'history' : 'drawing'} targetHistoryId={location.state?.targetHistoryId} resetKey={divinationResetKey} />
         )}
         {false && activeTab === 'drawing' && (
           <>
@@ -560,7 +561,11 @@ export default function BaZiPage() {
   );
 }
 
-const mainLayout = { width: '100%', minHeight: '100vh', background: '#050208', color: '#fff', position: 'relative', overflowX: 'hidden', overflowY: 'auto', fontFamily: 'Cinzel, serif' };
+const mainLayout = { width: '100%', height: '100vh', background: '#050208', color: '#fff', position: 'relative', overflow: 'hidden', overscrollBehavior: 'none', fontFamily: 'Cinzel, serif' };
+const baziDrawingBackdrop = {
+  background:
+    'linear-gradient(90deg, rgba(10,7,1,0.86), rgba(12,8,1,0.2) 48%, rgba(9,6,1,0.82)), url("/bazi/baziBackground.png") center / cover no-repeat'
+};
 const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 };
 const topNavBar = {
   boxSizing: 'border-box',
@@ -574,17 +579,17 @@ const tabBtn = { background: 'none', border: 'none', outline: 'none', WebkitTapH
 const activeTabBtn = { ...tabBtn, color: '#fff' };
 const activeUnderline = { position: 'absolute', bottom: -8, left: 0, right: 0, height: '2px', background: ACCENT, boxShadow: `0 0 10px ${ACCENT}` };
 const subLabel = { fontSize: '0.7rem', color: '#666', letterSpacing: '2px', marginTop: '4px' };
-const contentArea = { paddingTop: '80px', minHeight: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'visible', paddingBottom: '60px' };
-const flexLayout = { display: 'flex', height: 'calc(100vh - 80px)', padding: '25px 40px', gap: '25px', alignItems: 'stretch' };
+const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'hidden', paddingBottom: 0, boxSizing: 'border-box' };
+const flexLayout = { display: 'flex', height: 'calc(100vh - 118px)', padding: '16px 40px 0', gap: '25px', alignItems: 'stretch' };
 const sidebarWrapper = {
-  width: '320px', flexShrink: 0, background: 'rgba(0, 0, 0, 0.4)', borderRadius: '16px',
-  padding: '20px', border: '1px solid rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(5px)',
+  width: '320px', flexShrink: 0, background: 'rgba(0, 0, 0, 0.38)', borderRadius: '8px',
+  padding: '20px', border: '1px solid rgba(255,204,0,0.14)', backdropFilter: 'blur(5px)',
   display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0
 };
 const detailWrapper = {
-  flex: 1, height: '100%', overflowY: 'auto', background: 'rgba(0, 0, 0, 0.4)',
-  borderRadius: '16px', padding: '20px 80px', border: '1px solid rgba(255, 255, 255, 0.08)',
-  backdropFilter: 'blur(1.5px)'
+  flex: 1, height: '100%', overflowY: 'auto', background: 'rgba(0, 0, 0, 0.22)',
+  borderRadius: '8px', padding: '40px 80px', border: '1px solid rgba(255,204,0,0.14)',
+  backdropFilter: 'blur(1.5px)', boxShadow: 'inset 0 0 28px rgba(255,204,0,0.08)'
 };
 const searchBox = { display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255, 255, 255, 0.05)', padding: '12px 18px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: '20px' };
 const searchInput = { background: 'none', border: 'none', color: '#fff', outline: 'none', fontSize: '0.85rem', width: '100%' };
@@ -606,7 +611,15 @@ const invokeGlassBtn = { padding: '16px 40px', borderRadius: '2px', background: 
 const invokeGateBtn = { ...invokeGlassBtn, background: '#fff', color: '#000', border: 'none', fontWeight: 'bold', boxShadow: '0 0 25px rgba(255, 255, 255, 0.15)' };
 const catTag = { fontSize: '0.75rem', color: ACCENT, letterSpacing: '2px', fontWeight: 'bold' };
 const goldLabel = { color: ACCENT, letterSpacing: '6px', fontSize: '0.7rem', marginBottom: '15px', fontFamily: 'Cinzel' };
-const mainTitle = { fontSize: '2.6rem', letterSpacing: '4px', margin: 0 };
+const mainTitle = {
+  fontFamily: '"Noto Serif TC", "Songti TC", "PMingLiU", "Cinzel", serif',
+  fontSize: 'clamp(1.5rem, 3vw, 3.5rem)',
+  fontWeight: 400,
+  letterSpacing: '2px',
+  margin: 0,
+  lineHeight: 1.18,
+  color: 'rgba(245,238,222,0.92)'
+};
 const divider = { width: '60px', height: '2px', background: ACCENT, margin: '30px 0' };
 const detailText = { fontSize: '1.1rem', lineHeight: '1.9', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '40px', fontFamily: 'Inter, sans-serif' };
 const quoteBox = { background: 'rgba(255, 255, 255, 0.02)', padding: '25px', borderRadius: '8px', borderLeft: `4px solid ${ACCENT}` };
