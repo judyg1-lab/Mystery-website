@@ -29,31 +29,37 @@ const POSITION_LABELS = {
     text('%E5%95%8F%E9%A1%8C%E6%A0%B8%E5%BF%83'),
     text('%E9%9A%B1%E8%97%8F%E7%9B%B2%E9%BB%9E'),
     text('%E4%B8%8B%E4%B8%80%E6%AD%A5%E5%BB%BA%E8%AD%B0')
+  ],
+  soul_master: [
+    text('%E9%9D%88%E9%AD%82%E4%B8%BB%E7%89%8C')
   ]
 };
 
 const SPREAD_LAYOUTS = {
   relationship: [
-    { x: -192, y: 44 },
-    { x: 192, y: 44 },
-    { x: 0, y: -12 },
-    { x: -96, y: 166 },
-    { x: 96, y: 166 }
+    { x: -292, y: 55},
+    { x: -146, y: 55 },
+    { x: 0, y: 55 },
+    { x: 146, y: 55 },
+    { x: 292, y: 55 }
   ],
   three_cards: [
-    { x: -164, y: 24 },
-    { x: 0, y: 4 },
-    { x: 164, y: 24 }
+    { x: -164, y: 55 },
+    { x: 0, y: 55 },
+    { x: 164, y: 55 }
   ],
   open_reading: [
-    { x: -164, y: 24 },
-    { x: 0, y: 4 },
-    { x: 164, y: 24 }
+    { x: -164, y: 55},
+    { x: 0, y: 55 },
+    { x: 164, y: 55 }
   ],
   advice_spread: [
-    { x: -148, y: 26 },
-    { x: 148, y: 26 },
-    { x: 0, y: 142 }
+    { x: -164, y: 55 },
+    { x: 0, y: 55 },
+    { x: 164, y: 55 }
+  ],
+  soul_master: [
+    { x: 0, y: 55 }
   ]
 };
 
@@ -61,6 +67,15 @@ function getAssetUrl(path = '') {
   if (!path) return '';
   if (/^https?:\/\//i.test(path)) return path;
   return `${API_BASE_URL}${path}`;
+}
+
+function getMasterCardImagePath(name = '') {
+  const normalized = name
+    .toLowerCase()
+    .replace('the magician', 'the magus')
+    .replace('the high priestess', 'the priestess')
+    .trim();
+  return normalized ? `/tarot/cards/main/${encodeURIComponent(normalized)}.png` : '';
 }
 
 function getSpreadSlots(spread) {
@@ -75,21 +90,29 @@ function getSpreadSlots(spread) {
   }));
 }
 
-function getArcPosition(index) {
-  const outerCount = 40;
-  const isOuter = index < outerCount;
-  const ringIndex = isOuter ? index : index - outerCount;
-  const ringCount = isOuter ? outerCount : ARC_CARD_COUNT - outerCount;
-  const center = (ringCount - 1) / 2;
-  const norm = (ringIndex - center) / center;
-  const angle = norm * (isOuter ? 71 : 58) * (Math.PI / 180);
-  const radiusX = isOuter ? 650 : 468;
-  const radiusY = isOuter ? 258 : 172;
-  const baseline = isOuter ? 82 : 138;
+function getArcPosition(index, arcCardCount = ARC_CARD_COUNT) {
+  const OUTER_COUNT = arcCardCount <= 22 ? arcCardCount : 43;
+  const INNER_COUNT = Math.max(0, arcCardCount - OUTER_COUNT);
+
+  const isOuter = index < OUTER_COUNT;
+  const ringIndex = isOuter ? index : index - OUTER_COUNT;
+  const ringCount = isOuter ? OUTER_COUNT : INNER_COUNT;
+  const t = ringCount <= 1 ? 0 : ringIndex / (ringCount - 1);
+
+  const isMasterArc = arcCardCount <= 22;
+  const totalAngle = isMasterArc ? 68 : (isOuter ? 95 : 90);
+  const angleDeg = -(totalAngle / 2) + t * totalAngle;
+  const angle = angleDeg * (Math.PI / 180);
+
+  const radiusX = isMasterArc ? 530 : (isOuter ? 700 : 592);
+  const radiusY = isMasterArc ? 245 : (isOuter ? 307 : 276);
+  const baseY = isMasterArc ? 232 : (isOuter ? 242 : 318);
+
   const x = Math.sin(angle) * radiusX;
-  const y = baseline - Math.cos(angle) * radiusY;
-  const rotate = norm * (isOuter ? 47 : 38);
+  const y = baseY - Math.cos(angle) * radiusY;
+  const rotate = angleDeg * 0.72;
   const zIndex = isOuter ? 4 : 8;
+
   const edgeDistance = Math.min(ringIndex, ringCount - 1 - ringIndex);
   const gatherOrder = (isOuter ? 0 : 1) * 100 + edgeDistance;
 
@@ -102,6 +125,7 @@ export default function TarotDrawStage({
   spread,
   selectedDraws,
   isCompleting,
+  arcCardCount = ARC_CARD_COUNT,
   onDrawCard,
   onRevealComplete
 }) {
@@ -117,6 +141,7 @@ export default function TarotDrawStage({
   const [stageMode, setStageMode] = useState('choosing');
   const [flippedCards, setFlippedCards] = useState({});
   const [guideIndex, setGuideIndex] = useState(0);
+  const [hoveredArcIndex, setHoveredArcIndex] = useState(null);
   const slots = useMemo(() => getSpreadSlots(spread), [spread]);
   const nextSlot = slots[selectedDraws.length];
   const selectionComplete = selectedDraws.length >= slots.length;
@@ -125,6 +150,7 @@ export default function TarotDrawStage({
     setStageMode('choosing');
     setFlippedCards({});
     setGuideIndex(0);
+    setHoveredArcIndex(null);
     pickingIndexRef.current = null;
   }, [spread?.key]);
 
@@ -142,8 +168,8 @@ export default function TarotDrawStage({
       );
       gsap.fromTo(
         arcRef.current?.children || [],
-        { autoAlpha: 0, y: 34, scale: 0.9 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.36, stagger: 0.006, ease: 'power2.out', delay: 0.16 }
+        { autoAlpha: 0 },
+        { autoAlpha: 1, duration: 0.36, stagger: 0.006, ease: 'power2.out', delay: 0.16 }
       );
       gsap.fromTo(
         spreadMapRef.current?.children || [],
@@ -179,51 +205,14 @@ export default function TarotDrawStage({
   useEffect(() => {
     if (!selectionComplete || stageMode !== 'choosing') return undefined;
 
-    setStageMode('gathering');
-    const picked = new Set(selectedDraws.map((card) => card.sourceIndex));
-    const cards = Array.from(arcRef.current?.querySelectorAll('.arc-card-button') || [])
-      .filter((element) => !picked.has(Number(element.dataset.cardIndex)))
-      .sort((a, b) => Number(b.dataset.arcX) - Number(a.dataset.arcX));
-
     gatherTimelineRef.current?.kill();
-    gatherTimelineRef.current = gsap.timeline({
-      defaults: { ease: 'power3.inOut' },
-      onComplete: () => {
-        setStageMode('reveal');
-        setGuideIndex(0);
-        window.setTimeout(() => {
-          gsap.to(headerRef.current, { autoAlpha: 1, y: 0, duration: 0.38, ease: 'power2.out' });
-        }, 0);
-      }
-    });
-
-    gatherTimelineRef.current
-      .to(headerRef.current, { autoAlpha: 0, y: -10, duration: 0.24, ease: 'power2.out' }, 0)
-      .to(
-        cards,
-        {
-          x: (_, element) => -Number(element.dataset.arcX || 0) - 456,
-          y: 0,
-          rotation: (_, element) => -Number(element.dataset.arcRotate || 0) - 8,
-          scale: 0.62,
-          duration: 0.52,
-          stagger: 0.008,
-          force3D: true
-        },
-        0.06
-      )
-      .fromTo(
-        gatheredDeckRef.current,
-        { autoAlpha: 0, x: -28, y: 12, scale: 0.82 },
-        { autoAlpha: 1, x: 0, y: 0, scale: 1, duration: 0.54, ease: 'power3.out' },
-        0.62
-      )
-      .fromTo(
-        spreadMapRef.current,
-        { y: 28, scale: 0.92 },
-        { y: 0, scale: 1, duration: 0.62, ease: 'power3.out' },
-        0.54
-      );
+    setStageMode('reveal');
+    setGuideIndex(0);
+    gsap.fromTo(
+      spreadMapRef.current,
+      { y: 18, scale: 0.96 },
+      { y: 0, scale: 1, duration: 0.46, ease: 'power3.out' }
+    );
     return undefined;
   }, [selectedDraws, selectionComplete, stageMode]);
 
@@ -320,6 +309,35 @@ export default function TarotDrawStage({
     }, 420);
   }, [flippedCards, guideIndex, onRevealComplete, selectedDraws.length, stageMode]);
 
+  const handleArcPointerMove = useCallback((event) => {
+    if (stageMode !== 'choosing' || isCompleting || selectionComplete) {
+      setHoveredArcIndex(null);
+      return;
+    }
+
+    const buttons = Array.from(arcRef.current?.querySelectorAll('.arc-card-button') || [])
+      .filter((button) => !button.disabled);
+
+    let closestIndex = null;
+    let closestScore = Infinity;
+
+    buttons.forEach((button) => {
+      const rect = button.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = (event.clientX - centerX) / Math.max(rect.width, 1);
+      const dy = (event.clientY - centerY) / Math.max(rect.height, 1);
+      const score = dx * dx + dy * dy;
+
+      if (score < closestScore) {
+        closestScore = score;
+        closestIndex = Number(button.dataset.cardIndex);
+      }
+    });
+
+    setHoveredArcIndex(closestScore < 0.72 ? closestIndex : null);
+  }, [isCompleting, selectionComplete, stageMode]);
+
   return (
     <motion.div key="draw" ref={stageRef} {...fadeMotion} className="tarot-draw-stage" style={drawStage}>
       <style>{drawStageCSS}</style>
@@ -338,41 +356,29 @@ export default function TarotDrawStage({
 
       <div style={riteContext}>
         <div style={contextLabel}>CURRENT RITE</div>
-        <strong>{soulMaster || 'Soul Master'}</strong>
         <span>{spread.name}</span>
       </div>
 
       <div className="draw-master-card" style={drawMasterCard}>
         <img
-          src={getAssetUrl('/tarot/cards/main/death.png')}
+          src={soulMaster ? getAssetUrl(getMasterCardImagePath(soulMaster)) : cardBackUrl}
           alt={soulMaster || 'Master Card'}
           style={drawMasterImage}
         />
-        <span>MASTER CARD</span>
-        <strong>{soulMaster || 'DEATH'}</strong>
+        <span style={drawMasterLabel}>MASTER CARD</span>
+        <strong style={drawMasterName}>{soulMaster || '未抽取主牌'}</strong>
       </div>
 
-      <motion.div
-        ref={gatheredDeckRef}
-        className="gathered-deck"
-        style={{ ...gatheredDeck, opacity: stageMode === 'choosing' ? 0 : undefined }}
-        aria-hidden="true"
-      >
-        {Array.from({ length: 18 }, (_, index) => (
-          <span
-            key={index}
-            style={{
-              ...gatheredDeckCard(cardBackUrl),
-              transform: `translate(${index * 0.52}px, ${-index * 0.72}px) rotate(${-3 + index * 0.08}deg)`
-            }}
-          />
-        ))}
-      </motion.div>
-
       {(stageMode === 'choosing' || stageMode === 'gathering') && (
-        <div ref={arcRef} className="arc-deck" style={arcDeck}>
-          {Array.from({ length: ARC_CARD_COUNT }, (_, index) => {
-            const { x, y, rotate, zIndex, ring, gatherOrder } = getArcPosition(index);
+        <div
+          ref={arcRef}
+          className="arc-deck"
+          style={arcDeck}
+          onPointerMove={handleArcPointerMove}
+          onPointerLeave={() => setHoveredArcIndex(null)}
+        >
+          {Array.from({ length: arcCardCount }, (_, index) => {
+            const { x, y, rotate, zIndex, ring, gatherOrder } = getArcPosition(index, arcCardCount);
             const picked = selectedDraws.some((card) => card.sourceIndex === index);
 
             return (
@@ -398,10 +404,11 @@ export default function TarotDrawStage({
                   disabled={picked || isCompleting || stageMode !== 'choosing'}
                   onClick={(event) => handlePickCard(index, event.currentTarget)}
                   style={{
-                    ...fanCardBack(cardBackUrl),
+                    ...fanCardBack(cardBackUrl, arcCardCount),
                     opacity: picked ? 0.08 : 1,
                     cursor: picked || stageMode !== 'choosing' ? 'default' : 'pointer',
-                    pointerEvents: picked || stageMode !== 'choosing' ? 'none' : 'auto'
+                    pointerEvents: picked || stageMode !== 'choosing' ? 'none' : 'auto',
+                    transform: hoveredArcIndex === index ? 'translateY(-18px) scale(1.045)' : 'translateY(0) scale(1)'
                   }}
                 />
               </div>
@@ -435,7 +442,16 @@ export default function TarotDrawStage({
               }}
             >
               {isNextSlot && <span style={nextSlotRing} />}
-              {isGuided && <motion.span {...guideStarMotion} style={guideStar}>*</motion.span>}
+              {drawnCard && stageMode === 'reveal' && !flippedCards[index] && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: [0.45, 1, 0.45], scale: [0.85, 1.3, 0.85] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                  style={drawnGoldStar}
+                >
+                  ✦
+                </motion.span>
+              )}
               <div style={slotNumber}>{String(index + 1).padStart(2, '0')}</div>
               <button
                 type="button"
@@ -530,12 +546,12 @@ const baseBack = (cardBackUrl) => ({
   transform: 'translateZ(0)'
 });
 
-const fanCardBack = (cardBackUrl) => ({
+const fanCardBack = (cardBackUrl, arcCardCount = ARC_CARD_COUNT) => ({
   ...baseBack(cardBackUrl),
-  width: '70px',
-  height: '118px',
-  borderColor: 'rgba(235,238,244,0.26)',
-  boxShadow: '0 10px 24px rgba(0,0,0,0.5), 0 0 10px rgba(235,238,244,0.08)'
+  width: arcCardCount <= 22 ? '38px' : '28px',
+  height: arcCardCount <= 22 ? '66px' : '50px',
+  borderColor: 'rgba(235,238,244,0.18)',
+  boxShadow: '0 6px 14px rgba(0,0,0,0.42)'
 });
 
 const gatheredDeckCard = (cardBackUrl) => ({
@@ -560,8 +576,8 @@ const slotPlaceholder = (cardBackUrl) => ({
 const slotCardButton = (drawnCard, mode, guided) => ({
   position: 'relative',
   zIndex: 2,
-  width: mode === 'reveal' ? '88px' : '74px',
-  height: mode === 'reveal' ? '148px' : '124px',
+  width: mode === 'reveal' ? '124px' : '80px',
+  height: mode === 'reveal' ? '208px' : '134px',
   borderRadius: '8px',
   overflow: 'visible',
   padding: 0,
@@ -617,8 +633,8 @@ const drawStage = {
 };
 const drawHeader = {
   position: 'absolute',
-  left: '50%',
-  top: '18px',
+  left: 'calc(50% + 90px)',
+  top: '22px',
   transform: 'translateX(-50%)',
   width: 'min(680px, 92vw)',
   textAlign: 'center',
@@ -655,22 +671,26 @@ const floorUplight = {
 };
 const riteContext = {
   position: 'absolute',
-  left: '30px',
-  top: '188px',
+  left: '43px',
+  top: '280px',
   zIndex: 9,
   display: 'grid',
-  gap: '4px',
+  justifyItems: 'center',
+  gap: '8px',
+  width: '126px',
   color: 'rgba(255,255,255,0.74)',
+  textAlign: 'center',
   pointerEvents: 'none'
 };
 const drawMasterCard = {
   position: 'absolute',
-  left: '36px',
-  top: '28px',
+  left: '34px',
+  top: '24px',
   zIndex: 12,
   display: 'grid',
   justifyItems: 'center',
-  gap: '4px',
+  gap: '10px',
+  width: '148px',
   color: 'rgba(255,255,255,0.78)',
   transform: 'none',
   transformStyle: 'preserve-3d',
@@ -678,12 +698,24 @@ const drawMasterCard = {
   animation: 'none'
 };
 const drawMasterImage = {
-  width: '94px',
-  height: '158px',
+  width: '112px',
+  height: '188px',
   objectFit: 'cover',
   borderRadius: '8px',
   border: '1px solid rgba(235,238,244,0.38)',
   boxShadow: '0 18px 34px rgba(0,0,0,0.55), 0 0 24px rgba(235,238,244,0.16)'
+};
+const drawMasterLabel = {
+  color: 'rgba(255,255,255,0.74)',
+  fontSize: '0.86rem',
+  letterSpacing: '0.06em',
+  lineHeight: 1.1
+};
+const drawMasterName = {
+  color: '#f3d18a',
+  fontSize: '0.96rem',
+  letterSpacing: '0.04em',
+  lineHeight: 1.1
 };
 const gatheredDeck = {
   position: 'absolute',
@@ -696,11 +728,11 @@ const gatheredDeck = {
 };
 const arcDeck = {
   position: 'absolute',
-  left: '50%',
-  top: '42%',
+  left: 'calc(50% + 90px)',
+  top: '40%',
   width: '1px',
   height: '1px',
-  zIndex: 6,
+  zIndex: 9,
   pointerEvents: 'auto'
 };
 const arcCardUnit = {
@@ -712,19 +744,19 @@ const arcCardUnit = {
 };
 const spreadMap = {
   position: 'absolute',
-  left: '50%',
-  width: 'min(780px, 92vw)',
-  height: '380px',
+  left: 'calc(50% + 90px)',
+  width: 'min(800px, 90vw)',
+  height: '1000px',
   zIndex: 7,
   pointerEvents: 'auto',
   transition: 'top 520ms cubic-bezier(0.16, 1, 0.3, 1), transform 520ms cubic-bezier(0.16, 1, 0.3, 1)'
 };
 const spreadMapChoosing = {
-  top: '70%',
-  transform: 'translate(-50%, -50%) scale(0.86)'
+  top: '60%',
+  transform: 'translate(-50%, -50%) scale(1)'
 };
 const spreadMapReveal = {
-  top: '52%',
+  top: '36%',
   transform: 'translate(-50%, -50%) scale(1)'
 };
 const spreadSlot = {
@@ -742,40 +774,43 @@ const spreadSlot = {
 const slotNumber = {
   position: 'relative',
   zIndex: 3,
-  minWidth: '30px',
-  height: '20px',
-  padding: '0 8px',
-  borderRadius: '999px',
+  minWidth: '20px',
+  height: '16px',
+  padding: 0,
+  borderRadius: 0,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#e8ebf2',
-  background: 'rgba(3,1,8,0.72)',
-  border: '1px solid rgba(235,238,244,0.3)',
-  fontSize: '0.58rem',
-  letterSpacing: '1px'
+  color: 'rgba(212,175,55,0.9)',
+  background: 'transparent',
+  border: 'none',
+  fontSize: '0.82rem',
+  letterSpacing: '1px',
+  boxShadow: 'none',
+  marginBottom: '5px'
 };
 const slotCaption = {
   position: 'relative',
   zIndex: 3,
-  width: '150px',
-  minHeight: '40px',
+  width: '140px',
+  minHeight: '34px',
+  marginTop: '10px',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: '4px',
-  color: 'rgba(255,255,255,0.68)',
+  gap: '3px',
+  color: 'rgba(255,255,255,0.72)',
   fontFamily: zhFont,
-  fontSize: '0.72rem',
-  lineHeight: 1.35,
-  letterSpacing: '0.06em'
+  fontSize: '0.78rem',
+  lineHeight: 1.3,
+  letterSpacing: '0.04em'
 };
 const nextSlotRing = {
   position: 'absolute',
   left: '50%',
-  top: '76px',
-  width: '94px',
-  height: '144px',
+  top: '90px',
+  width: '88px',
+  height: '138px',
   transform: 'translate(-50%, -50%)',
   borderRadius: '10px',
   border: '1px solid rgba(235,238,244,0.34)',
@@ -784,26 +819,18 @@ const nextSlotRing = {
   zIndex: 1,
   animation: 'drawSlotBreath 1.7s ease-in-out infinite'
 };
-const guideStar = {
+const drawnGoldStar = {
   position: 'absolute',
-  left: '50%',
-  top: '48px',
-  zIndex: 5,
-  width: '32px',
-  height: '32px',
+  left: '45.8%',
+  top: '-30px',
   transform: 'translateX(-50%)',
-  display: 'grid',
-  placeItems: 'center',
-  color: '#f4f6fa',
-  fontSize: '1.65rem',
+  zIndex: 6,
+  fontSize: '1rem',
+  color: '#f3d18a',
   lineHeight: 1,
-  textShadow: '0 0 16px rgba(235,238,244,0.72), 0 0 28px rgba(188,19,254,0.28)',
-  pointerEvents: 'none'
-};
-const guideStarMotion = {
-  initial: { opacity: 0, y: -10, scale: 0.6 },
-  animate: { opacity: [0.65, 1, 0.65], y: [-3, -10, -3], scale: [0.9, 1.12, 0.9] },
-  transition: { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
+  textShadow: '0 0 8px rgba(212,175,55,1), 0 0 22px rgba(212,175,55,0.72)',
+  pointerEvents: 'none',
+  userSelect: 'none'
 };
 const drawnTray = {
   position: 'absolute',
@@ -833,9 +860,9 @@ const drawStageCSS = `
     content: "";
     position: absolute;
     left: 50%;
-    top: 42%;
-    width: 1180px;
-    height: 330px;
+    top: 39%;
+    width: 1320px;
+    height: 390px;
     transform: translate(-50%, -50%);
     border-radius: 50% 50% 0 0;
     pointer-events: none;
@@ -853,8 +880,8 @@ const drawStageCSS = `
   }
 
   .tarot-draw-stage::after {
-    width: 820px;
-    height: 250px;
+    width: 1040px;
+    height: 310px;
     top: 46%;
     opacity: 0.26;
     animation-delay: 0.7s;
@@ -879,12 +906,12 @@ const drawStageCSS = `
   @keyframes drawSlotBreath {
     0%, 100% {
       opacity: 0.42;
-      transform: translate(-50%, -50%) scale(0.96);
+      transform: translate(-50%, -50%) scale(1);
     }
 
     50% {
       opacity: 0.84;
-      transform: translate(-50%, -50%) scale(1.045);
+      transform: translate(-50%, -50%) scale(1.025);
     }
   }
 
@@ -902,18 +929,17 @@ const drawStageCSS = `
 
   .arc-card-button:not(:disabled):hover {
     z-index: 20;
-    transform: translate3d(0, -15px, 0) scale(1.05);
+    transform: translateY(-18px) scale(1.045);
   }
 
   .arc-card-button {
     will-change: transform;
-    transform: translateZ(0);
     backface-visibility: hidden;
     contain: layout paint style;
   }
 
   .arc-card-unit:hover {
-    z-index: 80 !important;
+    z-index: 120 !important;
   }
 
   @media (max-width: 860px) {

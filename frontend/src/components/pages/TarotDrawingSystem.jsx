@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, Copy, ExternalLink, Sparkles } from 'lucide-react';
+import { Bot, Copy, ExternalLink, Heart, Sparkles } from 'lucide-react';
 import TarotDrawStage from './TarotDrawStage';
 import MysticModal from '../MysticModal';
 
@@ -77,6 +77,13 @@ const SPREADS = [
   }
 ];
 
+const SOUL_MASTER_SPREAD = {
+  key: 'soul_master',
+  name: 'Soul Master Draw',
+  zhName: text('%E9%9D%88%E9%AD%82%E4%B8%BB%E7%89%8C%E6%8A%BD%E5%8F%96'),
+  count: 1
+};
+
 const SAMPLE_RESULTS = [
     'Ace of Cups', 'Love', 'Science', 'Victory', 'Wealth',
     'Princess of Disks', 'The Star', 'Art', 'Fortune'
@@ -105,6 +112,8 @@ function getAssetUrl(path = '') {
   if (/^https?:\/\//i.test(path)) return path;
   return `${API_BASE_URL}${path}`;
 }
+
+const getToken = () => localStorage.getItem('mystic_token') || localStorage.getItem('token') || '';
 
 function runSmoothViewTransition(update) {
   if (typeof document !== 'undefined' && document.startViewTransition) {
@@ -247,7 +256,7 @@ export function TarotPortalParticles({ active = false }) {
   return <canvas ref={canvasRef} style={portalCanvas} />;
 }
 
-export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange }) {
+export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, onImmersiveChange, onHistoryCreated }) {
   const [step, setStep] = useState('checking_master');
   const [soulMaster, setSoulMaster] = useState('');
   const [spread, setSpread] = useState(SPREADS[0]);
@@ -261,6 +270,8 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   const [showQuestionRequiredModal, setShowQuestionRequiredModal] = useState(false);
   const [showTarotPromptMenu, setShowTarotPromptMenu] = useState(false);
   const [tarotAiReport, setTarotAiReport] = useState('');
+  const [isTarotAiLoading, setIsTarotAiLoading] = useState(false);
+  const [savedHistory, setSavedHistory] = useState(null);
   const [isQuestionFocused, setIsQuestionFocused] = useState(false);
   const [activeSpreadIndex, setActiveSpreadIndex] = useState(1);
   const [isRiteTransitioning, setIsRiteTransitioning] = useState(false);
@@ -271,19 +282,76 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   const spreadStageRef = useRef(null);
   const shuffleLayout = useMemo(() => createShuffleLayout(), []);
   const drawableCards = useMemo(() => tarotCards, [tarotCards]);
+  const majorArcanaCards = useMemo(() => {
+    const majors = tarotCards
+      .filter((card) => String(card.suit || '').toUpperCase() === 'MAJOR')
+      .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+    return majors.length ? majors : MAJOR_MASTERS.map((name, index) => ({
+      id: `major-${index}`,
+      title: name,
+      subtitle: '',
+      imageUrl: `/tarot/cards/main/${encodeURIComponent(
+        name.toLowerCase()
+          .replace('the magician', 'the magus')
+          .replace('the high priestess', 'the priestess')
+      )}.png`,
+      meaning: '',
+      orderIndex: index
+    }));
+  }, [tarotCards]);
 
   useEffect(() => {
-    const savedMaster = localStorage.getItem('soul_master_card');
-    if (savedMaster) {
-      setSoulMaster(savedMaster);
-      setStep('select_spread');
-      return;
-    }
+    let alive = true;
 
-    const master = MAJOR_MASTERS[Math.floor(Math.random() * MAJOR_MASTERS.length)];
-    localStorage.setItem('soul_master_card', master);
-    setSoulMaster(master);
-    setStep('select_spread');
+    const enterSoulMasterDraw = () => {
+      setSpread(SOUL_MASTER_SPREAD);
+      setSelectedDraws([]);
+      setDrawnCards([]);
+      setTarotAiReport('');
+      setIsCompleting(false);
+      setStep('draw_master');
+    };
+
+    const loadSoulMaster = async () => {
+      const token = getToken();
+      if (token) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (!alive) return;
+          if (res.ok && data.masterCard) {
+            localStorage.setItem('soul_master_card', data.masterCard);
+            setSoulMaster(data.masterCard);
+            setStep('select_spread');
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to load soul master from profile:', error);
+        }
+
+        if (!alive) return;
+        localStorage.removeItem('soul_master_card');
+        enterSoulMasterDraw();
+        return;
+      }
+
+      const savedMaster = localStorage.getItem('soul_master_card');
+      if (savedMaster) {
+        setSoulMaster(savedMaster);
+        setStep('select_spread');
+        return;
+      }
+
+      enterSoulMasterDraw();
+    };
+
+    loadSoulMaster();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -304,6 +372,11 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   }, [step]);
 
   useEffect(() => {
+    onImmersiveChange?.(step === 'shuffle');
+    return () => onImmersiveChange?.(false);
+  }, [onImmersiveChange, step]);
+
+  useEffect(() => {
     const loadTarotCards = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/tarot/cards`);
@@ -318,10 +391,13 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   }, []);
 
   const drawSoulMaster = () => {
-    const master = MAJOR_MASTERS[Math.floor(Math.random() * MAJOR_MASTERS.length)];
-    localStorage.setItem('soul_master_card', master);
-    setSoulMaster(master);
-    setStep('select_spread');
+    setSpread(SOUL_MASTER_SPREAD);
+    setSelectedDraws([]);
+    setDrawnCards([]);
+    setSavedHistory(null);
+    setTarotAiReport('');
+    setIsTarotAiLoading(false);
+    setStep('draw_master');
   };
 
   const killRiteTransition = useCallback(() => {
@@ -333,7 +409,14 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
 
   const startShuffle = () => {
     if (isRiteTransitioning) return;
+    if (!soulMaster) {
+      setSpread(SOUL_MASTER_SPREAD);
+      setSelectedDraws([]);
+      setStep('draw_master');
+      return;
+    }
     if (!question.trim()) {
+      setShowQuestionGuide(false);
       setShowQuestionRequiredModal(true);
       return;
     }
@@ -347,7 +430,9 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
     runSmoothViewTransition(() => {
       setSelectedDraws([]);
       setDrawnCards([]);
+      setSavedHistory(null);
       setTarotAiReport('');
+      setIsTarotAiLoading(false);
       setShowTarotPromptMenu(false);
       setIsCompleting(false);
       setShuffleTick(0);
@@ -374,18 +459,37 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
 
   const selectSpreadWithRite = useCallback((item) => {
     if (isRiteTransitioning) return;
+    if (!soulMaster) {
+      setSpread(SOUL_MASTER_SPREAD);
+      setSelectedDraws([]);
+      setDrawnCards([]);
+      setSavedHistory(null);
+      setTarotAiReport('');
+      setIsTarotAiLoading(false);
+      setStep('draw_master');
+      return;
+    }
 
     setIsRiteTransitioning(true);
-    setRitualPhase('summoning');
+    setRitualPhase('idle');
     killRiteTransition();
 
     runSmoothViewTransition(() => {
       setSpread(item);
+      setSelectedDraws([]);
+      setDrawnCards([]);
+      setSavedHistory(null);
+      setTarotAiReport('');
+      setIsTarotAiLoading(false);
+      setShowTarotPromptMenu(false);
+      setIsCompleting(false);
+      setShuffleTick(0);
+      setShuffleMode('riffle');
       setStep('question');
-      setRitualPhase('waiting_question');
+      setRitualPhase('idle');
       setIsRiteTransitioning(false);
     });
-  }, [isRiteTransitioning, killRiteTransition]);
+  }, [isRiteTransitioning, killRiteTransition, soulMaster]);
 
   const drawOneCard = (sourceIndex) => {
     if (isCompleting) return;
@@ -415,8 +519,136 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
     }
   };
 
+  const drawSoulMasterFromArc = (sourceIndex) => {
+    if (isCompleting) return;
+    if (selectedDraws.length >= SOUL_MASTER_SPREAD.count) return;
+
+    const tarotCard = majorArcanaCards[sourceIndex % majorArcanaCards.length];
+    const card = {
+      id: `${Date.now()}-${sourceIndex}`,
+      sourceIndex,
+      tarotId: tarotCard?.id || null,
+      slug: tarotCard?.slug || null,
+      name: tarotCard?.title || MAJOR_MASTERS[sourceIndex % MAJOR_MASTERS.length],
+      subtitle: tarotCard?.subtitle || '',
+      imageUrl: tarotCard?.imageUrl || '',
+      meaning: tarotCard?.meaning || '',
+      position: 1
+    };
+
+    setSelectedDraws([card]);
+    setSavedHistory(null);
+    setIsCompleting(true);
+    setRitualPhase('waitingReveal');
+  };
+
+  const persistTarotHistory = useCallback(async (cards) => {
+    const token = getToken();
+    if (!token || !cards.length || !soulMaster || !question.trim()) return;
+
+    const trimmedQuestion = question.trim();
+    const content = JSON.stringify({
+      type: 'tarot_reading',
+      spread: {
+        key: spread.key,
+        name: spread.name,
+        zhName: spread.zhName,
+        count: spread.count
+      },
+      soulMaster,
+      question: trimmedQuestion,
+      cards: cards.map((card) => ({
+        position: card.position,
+        name: card.name,
+        subtitle: card.subtitle,
+        meaning: card.meaning,
+        imageUrl: card.imageUrl,
+        slug: card.slug,
+        tarotId: card.tarotId
+      })),
+      summary: [
+        `牌陣：${spread.name}`,
+        `主牌：${soulMaster}`,
+        `問題：${trimmedQuestion}`,
+        '',
+        '抽到的牌：',
+        ...cards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `｜${card.meaning}` : ''}`)
+      ].join('\n')
+    });
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/history/tarot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: trimmedQuestion,
+          content
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.history) {
+        setSavedHistory(data.history);
+        onHistoryCreated?.(data.history);
+      }
+    } catch (error) {
+      console.error('Failed to save tarot history:', error);
+    }
+  }, [onHistoryCreated, question, soulMaster, spread.count, spread.key, spread.name, spread.zhName]);
+
+  const completeSoulMasterDraw = useCallback(() => {
+    const masterCard = selectedDraws[0];
+    if (!masterCard?.name) return;
+
+    const masterName = masterCard.name;
+    localStorage.setItem('soul_master_card', masterName);
+    const token = getToken();
+    if (token) {
+      fetch(`${API_BASE_URL}/api/user/master-card`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ masterCard: masterName })
+      }).catch((error) => {
+        console.error('Failed to save soul master:', error);
+      });
+    }
+
+    runSmoothViewTransition(() => {
+      setSoulMaster(masterName);
+      setSpread(SPREADS[0]);
+      setSelectedDraws([]);
+      setDrawnCards([]);
+      setSavedHistory(null);
+      setTarotAiReport('');
+      setIsTarotAiLoading(false);
+      setIsCompleting(false);
+      setRitualPhase('idle');
+      setStep('select_spread');
+    });
+  }, [selectedDraws]);
+
   const completeDrawReading = useCallback(() => {
     if (!selectedDraws.length) return;
+    if (!soulMaster) {
+      setSpread(SOUL_MASTER_SPREAD);
+      setSelectedDraws([]);
+      setIsCompleting(false);
+      setStep('draw_master');
+      return;
+    }
+    if (!question.trim()) {
+      setShowQuestionRequiredModal(true);
+      setIsCompleting(false);
+      setStep('question');
+      return;
+    }
+
+    persistTarotHistory(selectedDraws);
 
     runSmoothViewTransition(() => {
       setDrawnCards(selectedDraws);
@@ -424,19 +656,21 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
       setRitualPhase('reading');
       setIsCompleting(false);
     });
-  }, [selectedDraws]);
+  }, [persistTarotHistory, question, selectedDraws, soulMaster]);
 
   const tarotPrompt = useMemo(() => {
-    if (!drawnCards.length) return '';
+    if (!drawnCards.length || !soulMaster) return '';
     return [
-      `請以托特塔羅專家的角度，分析這次「${spread.name}」占卜。`,
-      `主牌：${soulMaster || 'DEATH'}`,
-      `問題：${question || '未填寫'}`,
+      '你是一位熟悉托特塔羅、卡巴拉生命之樹、占星對應與心理占卜倫理的專業解牌師。請用繁體中文回覆，語氣清晰、溫柔、具體，不做恐嚇式斷言。',
+      `牌陣：${spread.name}`,
+      `靈魂主牌：${soulMaster}`,
+      `核心要求：請以靈魂主牌「${soulMaster}」作為本次問題分析與解牌的核心底色，說明它如何影響整體牌陣、當事人的盲點與可行行動。`,
+      `提問：${question.trim()}`,
       '',
       '抽到的牌：',
       ...drawnCards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `｜${card.meaning}` : ''}`),
       '',
-      '請分成：牌陣總覽、每張牌的位置解讀、三張牌之間的關係、目前最重要的提醒、具體行動建議。'
+      '請分成：1. 牌陣總覽與靈魂主牌底色；2. 每張牌的位置解讀；3. 牌與牌之間的關係與流動；4. 當下最重要的提醒；5. 三個具體行動建議。'
     ].join('\n');
   }, [drawnCards, question, soulMaster, spread.name]);
 
@@ -447,17 +681,65 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const generateTarotAiReport = () => {
-    if (!drawnCards.length) return;
+  const toggleResultFavorite = async () => {
+    const token = getToken();
+    if (!token || !savedHistory?.id) return;
+
+    try {
+      if (savedHistory.isFavorite && savedHistory.favoriteId) {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites/${savedHistory.favoriteId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const nextHistory = { ...savedHistory, isFavorite: false, favoriteId: null };
+        setSavedHistory(nextHistory);
+        onHistoryCreated?.(nextHistory);
+        return;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ historyId: savedHistory.id })
+      });
+      const data = await res.json();
+      if (res.ok && data.favorite) {
+        const nextHistory = { ...savedHistory, isFavorite: true, favoriteId: data.favorite.id };
+        setSavedHistory(nextHistory);
+        onHistoryCreated?.(nextHistory);
+      }
+    } catch (error) {
+      console.error('Failed to toggle tarot result favorite:', error);
+    }
+  };
+
+  const generateTarotAiReport = async () => {
+    if (!drawnCards.length || !tarotPrompt) return;
     setShowTarotPromptMenu(false);
-    setTarotAiReport([
-      `${spread.name} 的核心訊息已經收束。`,
-      '',
-      `主牌 ${soulMaster || 'DEATH'} 讓這次牌陣帶有轉化、切斷舊循環、重新定義選擇的底色。`,
-      `目前最亮的訊號是 ${drawnCards.map((card) => card.name).join('、')}。它們指向一個共同主題：先看清真正的問題，再決定下一步要投入什麼。`,
-      '',
-      '建議：把問題拆成「我能控制」與「我不能控制」兩欄，先對可控制的部分做一個小而明確的行動。'
-    ].join('\n'));
+    setIsTarotAiLoading(true);
+
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE_URL}/api/ai/reading`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ system: 'tarot', prompt: tarotPrompt })
+      });
+      const data = await res.json();
+      setTarotAiReport(res.ok && data.report ? data.report : (data.error || 'AI 解讀暫時無法完成，請稍後再試。'));
+    } catch (error) {
+      console.error('Tarot AI reading failed:', error);
+      setTarotAiReport('AI 解讀暫時無法完成，請稍後再試。');
+    } finally {
+      setIsTarotAiLoading(false);
+    }
   };
 
   const handlePrevSpread = () => {
@@ -474,15 +756,24 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
       return true;
     }
 
-    if (['question', 'shuffle', 'draw_cards', 'result'].includes(step)) {
+    if (step === 'draw_master' && !soulMaster) return true;
+
+    if (['shuffle', 'draw_cards', 'result'].includes(step)) {
       setIsQuestionFocused(false);
       setShowQuestionGuide(false);
-      setStep('select_spread');
+      setStep(soulMaster ? 'select_spread' : 'draw_master');
+      return true;
+    }
+
+    if (step === 'question') {
+      setIsQuestionFocused(false);
+      setShowQuestionGuide(false);
+      setStep(soulMaster ? 'select_spread' : 'draw_master');
       return true;
     }
 
     return false;
-  }, [showQuestionGuide, step]);
+  }, [showQuestionGuide, soulMaster, step]);
 
   useEffect(() => {
     if (!onBackHandlerChange) return undefined;
@@ -492,7 +783,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
   }, [handleDrawingBack, onBackHandlerChange]);
 
   return (
-    <section style={systemShell}>
+    <section style={{ ...systemShell, ...(step === 'shuffle' ? immersiveSystemShell : null), ...(step === 'result' ? { overflowY: 'auto', alignItems: 'flex-start' } : null) }}>
       <style>{drawSystemCSS}</style>
       {false && step === 'shuffle' && <TarotPortalParticles active />}
 
@@ -630,15 +921,21 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
             <div className="question-balance-column" style={questionBalanceColumn} aria-hidden="true" />
             <div className="question-master-card" style={questionMasterCard}>
               <img
-                src={getAssetUrl('/tarot/cards/main/death.png')}
-                alt="Death"
+                src={soulMaster ? getAssetUrl(`/tarot/cards/main/${encodeURIComponent(
+                  soulMaster
+                    .toLowerCase()
+                    .replace('the magician', 'the magus')
+                    .replace('the high priestess', 'the priestess')
+                    .trim()
+                )}.png`) : cardBackUrl}
+                alt={soulMaster || 'Master Card'}
                 style={questionMasterImage}
                 onError={(event) => {
                   event.currentTarget.src = cardBackUrl;
                 }}
               />
               <span style={questionMasterLabel}>MASTER CARD</span>
-              <strong style={questionMasterName}>DEATH</strong>
+              <strong style={questionMasterName}>{soulMaster || '未抽取主牌'}</strong>
             </div>
             <div
               className={`question-rite-panel ${isQuestionFocused ? 'focused' : ''}`}
@@ -695,37 +992,51 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
             <div style={shuffleSurface}>
               {shuffleLayout.map((card) => {
                 const seed = (shuffleTick + 1) * (card.id + 3);
+                const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
+                const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 820;
                 const randomX = Math.sin(seed * 12.9898) * 0.5 + 0.5;
                 const randomY = Math.sin(seed * 78.233) * 0.5 + 0.5;
                 const randomRotate = Math.sin(seed * 37.719);
-                const riffleSide = card.id % 2 === 0 ? -1 : 1;
-                const riffleLane = (card.stack % 13) - 6;
-                const riffleWave = Math.sin(shuffleTick * 1.2 + card.stack * 0.7) * 28;
-                const isRiffle = shuffleMode === 'riffle';
+                const randomScale = Math.sin(seed * 19.137) * 0.5 + 0.5;
+                const randomDepth = Math.sin(seed * 5.781) * 0.5 + 0.5;
+                const randomRotateY = Math.sin(seed * 23.456);
+                const randomRotateX = Math.sin(seed * 41.234);
+                const driftX = Math.sin(shuffleTick * 0.7 + card.id) * 34;
+                const driftY = Math.cos(shuffleTick * 0.62 + card.id * 0.45) * 26;
 
                 return (
                   <motion.div
                     key={card.id}
                     animate={{
-                      x: isRiffle ? riffleLane * 6 + riffleSide * 28 : (randomX - 0.5) * 920,
-                      y: isRiffle ? riffleSide * (76 + riffleWave) : (randomY - 0.5) * 430,
-                      rotate: isRiffle ? riffleSide * (7 + card.stack * 0.4) : randomRotate * 92,
-                      scale: isRiffle ? 0.58 : 0.5,
-                      opacity: isRiffle ? 0.9 : card.id < 70 ? 0.92 : 0.55
+                      x: (randomX - 0.5) * (viewportWidth + 220) + driftX,
+                      y: (randomY - 0.5) * (viewportHeight + 180) + driftY,
+                      rotate: randomRotate * 6,       // 22 → 6，幾乎不側轉
+                      rotateY: randomRotateY * 28,    // 68 → 28，牌大致面向觀眾
+                      rotateX: randomRotateX * 8,     // 22 → 8，只有輕微前後傾斜
+                      scale: 0.52 + randomScale * 0.44,
+                      opacity: 0.58 + randomDepth * 0.38,
+                      zIndex: Math.round(randomDepth * 50)
                     }}
                     transition={{
-                      duration: isRiffle ? 0.42 : 0.72,
-                      delay: card.delay,
-                      ease: 'easeInOut'
+                      duration: 0.9 + randomDepth * 0.42,
+                      delay: card.delay * 0.45,
+                      ease: [0.16, 1, 0.3, 1]
                     }}
-                    style={{ ...tableCardBack(cardBackUrl), position: 'absolute', left: '50%', top: '50%', marginLeft: '-52px', marginTop: '-87px' }}
+                    style={{
+                      ...tableCardBack(cardBackUrl),
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      marginLeft: '-52px',
+                      marginTop: '-87px',
+                      transformStyle: 'preserve-3d'
+                    }}
                   />
                 );
               })}
             </div>
             <div style={shuffleControl}>
-              <div style={portalText}>TABLE SHUFFLE</div>
-              <p style={shuffleHint}>{COPY.shuffleHint}</p>
+              <p style={shuffleHint}>牌面正在隨機洗牌，感覺完成後停止。</p>
               <motion.button whileHover={buttonHover} whileTap={buttonTap} onClick={stopShuffle} disabled={isRiteTransitioning} style={primaryButton}>
                 <Sparkles size={17} />
                 {COPY.stopShuffle}
@@ -747,8 +1058,50 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
           />
         )}
 
+        {step === 'draw_master' && (
+          <TarotDrawStage
+            key="draw-master"
+            cardBackUrl={cardBackUrl}
+            soulMaster={selectedDraws[0]?.name || ''}
+            spread={SOUL_MASTER_SPREAD}
+            selectedDraws={selectedDraws}
+            isCompleting={isCompleting}
+            arcCardCount={22}
+            onDrawCard={drawSoulMasterFromArc}
+            onRevealComplete={completeSoulMasterDraw}
+          />
+        )}
+
         {step === 'result' && (
           <motion.div key="result" {...fadeMotion} style={resultStage}>
+            <motion.button
+              type="button"
+              aria-label="Favorite tarot result"
+              title={savedHistory?.id ? '收藏這次占卜' : '歷史紀錄保存後可收藏'}
+              style={resultFavoriteButton(savedHistory?.isFavorite)}
+              whileHover={resultFavoriteHover(savedHistory?.isFavorite)}
+              whileTap={buttonTap}
+              disabled={!savedHistory?.id}
+              onClick={toggleResultFavorite}
+            >
+              <Heart size={20} fill={savedHistory?.isFavorite ? '#bc13fe' : 'transparent'} />
+            </motion.button>
+            <div style={resultMasterCard}>
+              <img
+                src={soulMaster ? getAssetUrl(`/tarot/cards/main/${encodeURIComponent(
+                  soulMaster
+                    .toLowerCase()
+                    .replace('the magician', 'the magus')
+                    .replace('the high priestess', 'the priestess')
+                    .trim()
+                )}.png`) : cardBackUrl}
+                alt={soulMaster || 'Master Card'}
+                style={resultMasterImage}
+                onError={(e) => { e.currentTarget.src = cardBackUrl; }}
+              />
+              <span style={resultMasterLabel}>MASTER CARD</span>
+              <strong style={resultMasterName}>{soulMaster || '未抽取主牌'}</strong>
+            </div>
             <div style={resultHeader}>
               <div style={goldLabel}>READING RESULT</div>
               <h2 style={title}>{spread.name}</h2>
@@ -772,9 +1125,9 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange })
                   </div>
                 )}
               </div>
-              <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={generateTarotAiReport}>
+              <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={generateTarotAiReport} disabled={isTarotAiLoading}>
                 <Bot size={16} />
-                <span>AI 解讀</span>
+                <span>{isTarotAiLoading ? 'AI 解讀中' : 'AI 解讀'}</span>
               </motion.button>
             </div>
             {tarotAiReport && <pre style={tarotAiReportBox}>{tarotAiReport}</pre>}
@@ -881,38 +1234,10 @@ function FloatingGuideBook({ onClick, style }) {
 }
 
 function ResultSpread({ cards, spread, cardBackUrl }) {
-  if (spread.key !== 'relationship') {
-    return (
-      <div style={simpleResultSpread}>
-        {cards.map((card) => (
-          <ResultCard key={card.id} card={card} cardBackUrl={cardBackUrl} />
-        ))}
-      </div>
-    );
-  }
-
-  const slots = [
-    { left: '34%', top: '72%' },
-    { left: '66%', top: '72%' },
-    { left: '50%', top: '56%' },
-    { left: '50%', top: '30%' },
-    { left: '50%', top: '84%' }
-  ];
-
   return (
-    <div style={relationshipSpread}>
-      {cards.map((card, index) => (
-        <ResultCard
-          key={card.id}
-          card={card}
-          cardBackUrl={cardBackUrl}
-          style={{
-            position: 'absolute',
-            left: slots[index]?.left || '50%',
-            top: slots[index]?.top || '50%',
-            transform: 'translate(-50%, -50%)'
-          }}
-        />
+    <div style={simpleResultSpread}>
+      {cards.map((card) => (
+        <ResultCard key={card.id} card={card} cardBackUrl={cardBackUrl} />
       ))}
     </div>
   );
@@ -1012,9 +1337,9 @@ const tableCardBack = (cardBackUrl) => ({
 
 const resultCardFace = (cardBackUrl) => ({
   ...baseBack(cardBackUrl),
-  width: '92px',
-  height: '156px',
-  margin: '0 auto 12px'
+  width: '158px',
+  height: '266px',
+  margin: '0 auto 14px'
 });
 
 const systemShell = {
@@ -1027,6 +1352,12 @@ const systemShell = {
   justifyContent: 'center',
   overflow: 'hidden',
   fontFamily: "'Cinzel', serif"
+};
+const immersiveSystemShell = {
+  height: '100vh',
+  minHeight: '100vh',
+  alignItems: 'stretch',
+  justifyContent: 'stretch'
 };
 const portalCanvas = { position: 'absolute', inset: '50% auto auto 50%', transform: 'translate(-50%, -50%)', opacity: 0.86, pointerEvents: 'none' };
 const panel = {
@@ -1592,7 +1923,8 @@ const shuffleStage = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  overflow: 'hidden'
+  overflow: 'hidden',
+  background: 'radial-gradient(circle at 50% 50%, rgba(44,10,58,0.26), rgba(0,0,0,0.96) 54%, #000 100%)'
 };
 const shuffleMagicFloor = {
   position: 'absolute',
@@ -1625,41 +1957,90 @@ const shuffleSacredGlow = {
 };
 const shuffleSurface = {
   position: 'absolute',
-  inset: '4% 4% 18%',
-  transform: 'perspective(1200px) rotateX(10deg)',
-  zIndex: 3
+  inset: '-8% -8% -8%',
+  perspective: '4000px',
+  perspectiveOrigin: '50% 50%',
+  transformStyle: 'preserve-3d',
+  zIndex: 3,
+  overflow: 'hidden'
 };
 const shuffleControl = {
   position: 'absolute',
   left: '50%',
-  bottom: '22px',
+  bottom: '28px',
   transform: 'translateX(-50%)',
-  zIndex: 5,
+  zIndex: 80,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: '10px'
+  gap: '12px',
+  width: 'min(520px, 88vw)',
+  padding: '15px 18px 18px',
+  borderTop: '1px solid rgba(212,175,55,0.22)',
+  background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.62))',
+  backdropFilter: 'blur(2px)'
 };
 const portalText = { color: '#d4af37', letterSpacing: '5px', fontSize: '0.78rem' };
-const shuffleHint = { maxWidth: '560px', margin: 0, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontFamily: zhFont, lineHeight: 1.7, fontSize: '0.92rem' };
+const shuffleHint = { maxWidth: '520px', margin: 0, color: 'rgba(255,255,255,0.72)', textAlign: 'center', fontFamily: zhFont, lineHeight: 1.6, fontSize: '0.9rem', letterSpacing: '0.08em' };
 const resultStage = {
   position: 'relative',
   zIndex: 2,
-  width: 'min(1080px, 96vw)',
-  minHeight: '620px',
+  width: 'min(1280px, 96vw)',
+  minHeight: '100%',
   backdropFilter: 'blur(2px)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
-  paddingTop: '18px',
+  paddingTop: '24px',
+  paddingLeft: '180px',
+  paddingBottom: '64px',
   boxSizing: 'border-box'
 };
 const resultHeader = { textAlign: 'center', marginTop: '8px' };
 const resultSubcopy = { margin: '-8px 0 0', color: 'rgba(255,255,255,0.68)', fontFamily: zhFont, letterSpacing: '0.08em' };
-const simpleResultSpread = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '34px', flex: '0 0 auto', width: '100%', minHeight: '300px' };
+const simpleResultSpread = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'flex-start',
+  flexWrap: 'wrap',
+  gap: '24px',
+  flex: '0 0 auto',
+  width: '100%',
+  marginTop: '20px'
+};
+const resultFavoriteButton = (active) => ({
+  position: 'absolute',
+  top: '24px',
+  right: '28px',
+  zIndex: 20,
+  width: '44px',
+  height: '44px',
+  borderRadius: '50%',
+  border: `1px solid ${active ? 'rgba(188,19,254,0.72)' : 'rgba(212,175,55,0.34)'}`,
+  background: active
+    ? 'radial-gradient(circle, rgba(188,19,254,0.26), rgba(7,3,12,0.78))'
+    : 'rgba(5,2,10,0.72)',
+  color: active ? '#f3c5ff' : 'rgba(255,255,255,0.72)',
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer',
+  opacity: active ? 1 : 0.86,
+  boxShadow: active
+    ? '0 0 18px rgba(188,19,254,0.34), inset 0 0 14px rgba(188,19,254,0.16)'
+    : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 0 14px rgba(212,175,55,0.08)',
+  transition: 'filter 160ms ease, opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease'
+});
+const resultFavoriteHover = (active) => ({
+  scale: 1.08,
+  opacity: 1,
+  borderColor: active ? 'rgba(244,197,255,0.9)' : 'rgba(188,19,254,0.66)',
+  filter: 'brightness(1.14) drop-shadow(0 0 14px rgba(188,19,254,0.56))',
+  boxShadow: active
+    ? '0 0 24px rgba(188,19,254,0.48), inset 0 0 18px rgba(188,19,254,0.22)'
+    : '0 0 20px rgba(188,19,254,0.3), inset 0 0 14px rgba(188,19,254,0.12)'
+});
 const relationshipSpread = { position: 'relative', flex: 1, width: 'min(760px, 92vw)', minHeight: '460px' };
-const resultCardWrap = { width: '142px', textAlign: 'center', color: '#fff' };
+const resultCardWrap = { width: '182px', textAlign: 'center', color: '#fff' };
 const resultNumber = { color: '#d4af37', fontSize: '0.62rem', letterSpacing: '2px', marginBottom: '7px' };
 const resultName = { color: '#fff', fontSize: '0.92rem', letterSpacing: '1.5px', lineHeight: 1.35 };
 const resultSubtitle = { marginTop: '5px', color: 'rgba(212,175,55,0.72)', fontSize: '0.68rem', letterSpacing: '1px' };
@@ -1669,9 +2050,46 @@ const tarotResultActions = {
   justifyContent: 'center',
   alignItems: 'center',
   gap: '12px',
-  marginTop: '18px',
+  marginTop: '28px',
   zIndex: 12
 };
+const resultMasterCard = {
+  position: 'absolute',
+  left: '20px',
+  top: '18px',
+  zIndex: 12,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '8px',
+  width: '148px',
+  color: 'rgba(255,255,255,0.78)',
+  pointerEvents: 'none'
+};
+
+const resultMasterImage = {
+  width: '112px',
+  height: '188px',
+  objectFit: 'cover',
+  borderRadius: '8px',
+  border: '1px solid rgba(235,238,244,0.38)',
+  boxShadow: '0 18px 34px rgba(0,0,0,0.55), 0 0 24px rgba(235,238,244,0.16)'
+};
+
+const resultMasterLabel = {
+  color: 'rgba(255,255,255,0.74)',
+  fontSize: '0.72rem',
+  letterSpacing: '0.08em',
+  lineHeight: 1.1
+};
+
+const resultMasterName = {
+  color: '#f3d18a',
+  fontSize: '0.96rem',
+  letterSpacing: '0.04em',
+  lineHeight: 1.1
+};
+
 const tarotPromptWrap = { position: 'relative' };
 const tarotActionButton = {
   display: 'inline-flex',
@@ -1690,13 +2108,18 @@ const tarotActionButton = {
   letterSpacing: '0.12em',
   cursor: 'pointer',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.34)',
-  transition: 'filter 180ms ease, border-color 180ms ease, transform 180ms ease'
+  transition: 'filter 180ms ease, border-color 180ms ease, transform 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease'
 };
 const tarotActionHover = {
-  y: -2,
-  borderColor: 'rgba(188,19,254,0.54)',
-  filter: 'brightness(1.08)'
+  y: -3,
+  scale: 1.045,
+  borderColor: 'rgba(226,105,255,0.85)',
+  background: 'linear-gradient(180deg, rgba(104,31,132,0.92), rgba(33,8,50,0.96))',
+  color: '#fff',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -14px 28px rgba(188,19,254,0.22), 0 0 24px rgba(188,19,254,0.38), 0 0 0 1px rgba(212,175,55,0.24)',
+  filter: 'brightness(1.22) saturate(1.2) drop-shadow(0 0 18px rgba(188,19,254,0.58))'
 };
+
 const tarotPromptMenu = {
   position: 'absolute',
   left: '50%',
@@ -1730,17 +2153,18 @@ const tarotPromptMenuItem = {
   transition: 'background 160ms ease, color 160ms ease, transform 160ms ease'
 };
 const tarotAiReportBox = {
-  width: 'min(720px, 92vw)',
-  margin: '16px auto 0',
-  padding: '16px 18px',
-  borderRadius: '6px',
-  border: '1px solid rgba(188,19,254,0.2)',
-  background: 'rgba(5,2,10,0.62)',
-  color: 'rgba(255,255,255,0.78)',
+  width: 'min(900px, 92vw)',
+  margin: '28px auto 0',
+  padding: '28px 36px',
+  borderRadius: '10px',
+  border: '1px solid rgba(188,19,254,0.22)',
+  background: 'rgba(5,2,10,0.78)',
+  color: 'rgba(255,255,255,0.86)',
   fontFamily: zhFont,
-  fontSize: '0.86rem',
-  lineHeight: 1.8,
-  whiteSpace: 'pre-wrap'
+  fontSize: '0.94rem',
+  lineHeight: 2.1,
+  whiteSpace: 'pre-wrap',
+  backdropFilter: 'blur(6px)'
 };
 const floatingGuideBook = {
   position: 'absolute',

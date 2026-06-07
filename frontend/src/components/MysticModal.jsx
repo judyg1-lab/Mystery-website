@@ -8,6 +8,7 @@ export default function MysticModal({
     onConfirm,
     title = "CONFIRMATION",
     message,
+    children,
     confirmText = "確認",
     cancelText = "取消",
     type = "info" // danger 紅邊微光, info 紫邊微光
@@ -39,7 +40,7 @@ export default function MysticModal({
                 {isDanger ? <AlertTriangle size={24} color="#ff4444" /> : <ShieldAlert size={24} color="#bc13fe" />}
                 <h3 style={{ ...modalStyles.modalTitle, color: titleColor }}>{title}</h3>
             </div>
-            <p style={modalStyles.modalBodyText}>{message}</p>
+            {children ? <div style={modalStyles.modalBodyText}>{children}</div> : <p style={modalStyles.modalBodyText}>{message}</p>}
             <div style={modalStyles.modalActionRow}>
                 {cancelText && (
                 <motion.button

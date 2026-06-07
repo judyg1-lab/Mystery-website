@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
 
@@ -80,7 +81,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user.userId },
-            select: { id: true, username: true, email: true, phone: true, bio: true, avatarUrl: true }
+            select: { id: true, username: true, email: true, phone: true, bio: true, avatarUrl: true, masterCard: true }
     });
     res.json(user);
     } catch (error) {res.status(500).json({ error: '檔案讀取失敗' });}});
@@ -106,6 +107,36 @@ app.put('/api/user/profile/update', authenticateToken, async (req, res) => {
             data: { username, bio }});
         res.json({ message: '個人檔案更新完成', user: updatedUser });
     } catch (error) {res.status(500).json({ error: '設定更新失敗' });}});
+
+app.put('/api/user/master-card', authenticateToken, async (req, res) => {
+    const { masterCard } = req.body;
+    if (!masterCard || typeof masterCard !== 'string') {
+        return res.status(400).json({ error: '請提供主牌名稱' });
+    }
+
+    try {
+        const user = await prisma.user.update({
+            where: { id: req.user.userId },
+            data: { masterCard },
+            select: { id: true, masterCard: true }
+        });
+        res.json({ message: '靈魂主牌已同步', masterCard: user.masterCard });
+    } catch (error) {
+        res.status(500).json({ error: '主牌同步失敗' });
+    }
+});
+
+app.delete('/api/user/master-card', authenticateToken, async (req, res) => {
+    try {
+        await prisma.user.update({
+            where: { id: req.user.userId },
+            data: { masterCard: null }
+        });
+        res.json({ message: '靈魂主牌已清除' });
+    } catch (error) {
+        res.status(500).json({ error: '主牌清除失敗' });
+    }
+});
 
 // put means update
 app.put('/api/user/change-password', authenticateToken, async (req, res) => {
@@ -416,6 +447,72 @@ const HISTORY_SYSTEMS = {
     ziwei: 'ZIWEI'
 };
 
+const AI_SYSTEM_LABELS = {
+    tarot: '托特塔羅',
+    astrology: '西洋星盤',
+    bazi: '八字四柱',
+    ziwei: '紫微斗數'
+};
+
+async function generateGeminiReading(prompt) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        const error = new Error('Gemini API key is not configured');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const response = await axios.post(url, {
+        contents: [
+            {
+                role: 'user',
+                parts: [{ text: prompt }]
+            }
+        ],
+        generationConfig: {
+            temperature: 0.72,
+            topP: 0.92,
+            maxOutputTokens: 2200
+        }
+    }, { timeout: 30000 });
+
+    const report = response.data?.candidates?.[0]?.content?.parts
+        ?.map(part => part.text || '')
+        .join('\n')
+        .trim();
+
+    if (!report) {
+        const error = new Error('Gemini returned an empty response');
+        error.statusCode = 502;
+        throw error;
+    }
+
+    return report;
+}
+
+app.post('/api/ai/reading', authenticateToken, async (req, res) => {
+    const system = String(req.body?.system || '').toLowerCase();
+    const prompt = String(req.body?.prompt || '').trim();
+
+    if (!AI_SYSTEM_LABELS[system]) {
+        return res.status(400).json({ error: '不支援的 AI 判讀類型' });
+    }
+
+    if (!prompt) {
+        return res.status(400).json({ error: '缺少 AI 判讀 prompt' });
+    }
+
+    try {
+        const report = await generateGeminiReading(prompt);
+        res.json({ system, label: AI_SYSTEM_LABELS[system], report });
+    } catch (error) {
+        console.error('Gemini reading failed:', error.response?.data || error.message);
+        res.status(error.statusCode || 500).json({ error: 'AI 判讀暫時無法完成，請稍後再試。' });
+    }
+});
+
 app.post('/api/history/:system', authenticateToken, async (req, res) => {
     const systemType = HISTORY_SYSTEMS[String(req.params.system || '').toLowerCase()];
     const { title, content } = req.body || {};
@@ -455,6 +552,83 @@ app.post('/api/history/:system', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Create history failed:', error);
         res.status(500).json({ error: 'Failed to create history' });
+    }
+});
+
+app.put('/api/history/:system/:id', authenticateToken, async (req, res) => {
+    const systemType = HISTORY_SYSTEMS[String(req.params.system || '').toLowerCase()];
+    const historyId = Number(req.params.id);
+    const { title } = req.body || {};
+
+    if (!systemType || !Number.isInteger(historyId)) {
+        return res.status(400).json({ error: 'Invalid history request' });
+    }
+
+    if (!String(title || '').trim()) {
+        return res.status(400).json({ error: 'title is required' });
+    }
+
+    try {
+        const current = await prisma.history.findFirst({
+            where: { id: historyId, userId: req.user.userId, systemType }
+        });
+
+        if (!current) {
+            return res.status(404).json({ error: 'History not found' });
+        }
+
+        const history = await prisma.history.update({
+            where: { id: historyId },
+            data: { title: String(title).trim() },
+            include: { favorites: true }
+        });
+
+        res.json({
+            history: {
+                id: history.id,
+                title: history.title,
+                content: history.content,
+                date: history.createdAt.toLocaleDateString('zh-TW', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }),
+                isFavorite: history.favorites.length > 0,
+                favoriteId: history.favorites[0]?.id || null
+            }
+        });
+    } catch (error) {
+        console.error('Update history failed:', error);
+        res.status(500).json({ error: 'Failed to update history' });
+    }
+});
+
+app.delete('/api/history/:system/:id', authenticateToken, async (req, res) => {
+    const systemType = HISTORY_SYSTEMS[String(req.params.system || '').toLowerCase()];
+    const historyId = Number(req.params.id);
+
+    if (!systemType || !Number.isInteger(historyId)) {
+        return res.status(400).json({ error: 'Invalid history request' });
+    }
+
+    try {
+        const current = await prisma.history.findFirst({
+            where: { id: historyId, userId: req.user.userId, systemType }
+        });
+
+        if (!current) {
+            return res.status(404).json({ error: 'History not found' });
+        }
+
+        await prisma.favorite.deleteMany({
+            where: { historyId, userId: req.user.userId }
+        });
+        await prisma.history.delete({ where: { id: historyId } });
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Delete history failed:', error);
+        res.status(500).json({ error: 'Failed to delete history' });
     }
 });
 

@@ -13,6 +13,15 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import MysticModal from '../components/MysticModal';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const TAROT_CARD_BACK_URL = `${API_BASE_URL}/tarot/tarot-card.png`;
+
+const getAssetUrl = (path = '') => {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}${path}`;
+};
+
 const SYSTEM_COLORS = {
   'All': { color: '#ffffff', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
   'TAROT': { color: '#bc13fe', bg: 'rgba(188,19,254,0.12)', border: 'rgba(188,19,254,0.3)' },
@@ -21,6 +30,13 @@ const SYSTEM_COLORS = {
   'ZIWEI': { color: '#00ccff', bg: 'rgba(0,204,255,0.12)', border: 'rgba(0,204,255,0.3)' },
   '塔羅': 'TAROT', '星盤': 'ASTROLOGY', '八字': 'BAZI', '紫微': 'ZIWEI' // 防呆
 };
+
+const normalizeTarotName = (value = '') =>
+  value
+    .toLowerCase()
+    .replace(/^no\.?\s*/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 
 const UniverseCanvas = (theme, density) => {
   const canvasRef = useRef(null);
@@ -131,11 +147,13 @@ export default function ProfilePage() {
       username: 'User',
       email: 'usert@mystic.com',
       bio: '探索星辰與命運的記錄者。',
-      avatarUrl: ''
+      avatarUrl: '',
+      masterCard: ''
     };
   });
       // initialize avatarUrl state based on userInfo
   const [avatarUrl, setAvatarUrl] = useState(userInfo.avatarUrl || '');
+  const [tarotCards, setTarotCards] = useState([]);
 
   const [passwordData, setPasswordData] = useState({currentPassword: '',newPassword: ''});
   useEffect(() => {
@@ -148,12 +166,48 @@ export default function ProfilePage() {
         if (res.ok) {
           setUserInfo(data);
           if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+          if (data.masterCard) {
+            localStorage.setItem('soul_master_card', data.masterCard);
+          } else {
+            localStorage.removeItem('soul_master_card');
+          }
           localStorage.setItem('user_info', JSON.stringify(data));
         }
       } catch (err) {console.error("即時同步星軌失敗:", err);}
     };
     fetchLatestProfile();
   }, []);
+
+  useEffect(() => {
+    const fetchTarotCards = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/tarot/cards`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) setTarotCards(data);
+      } catch (err) {
+        console.error('塔羅主牌資料讀取失敗:', err);
+      }
+    };
+
+    fetchTarotCards();
+  }, []);
+
+  const masterCardEntry = useMemo(() => {
+    const masterName = userInfo.masterCard || '';
+    if (!masterName) return null;
+    const normalizedMaster = normalizeTarotName(masterName)
+      .replace('the magician', 'the magus')
+      .replace('the high priestess', 'the priestess');
+    const card = tarotCards.find((item) =>
+      normalizeTarotName(item.title) === normalizedMaster ||
+      normalizeTarotName(item.slug) === normalizedMaster
+    );
+
+    return {
+      name: masterName,
+      imageUrl: card?.imageUrl ? getAssetUrl(card.imageUrl) : TAROT_CARD_BACK_URL
+    };
+  }, [tarotCards, userInfo.masterCard]);
 
   const handleAvatarClick = () => {
     fileInputRef.current.click();
@@ -425,6 +479,51 @@ export default function ProfilePage() {
       }
     };
 
+  const triggerDeleteMasterCard = () => {
+    setModalConfig({
+      isOpen: true,
+      title: 'RESET MASTER CARD',
+      message: '確定要刪除目前的靈魂主牌紀錄嗎？刪除後，下次進入塔羅抽牌系統會重新抽取主牌。',
+      confirmText: '刪除主牌',
+      cancelText: '取消',
+      type: 'danger',
+      onConfirm: executeDeleteMasterCard
+    });
+  };
+
+  const executeDeleteMasterCard = async () => {
+    try {
+      const token = localStorage.getItem('mystic_token');
+      const res = await fetch(`${API_BASE_URL}/api/user/master-card`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        localStorage.removeItem('soul_master_card');
+        setUserInfo(prev => ({ ...prev, masterCard: '' }));
+        const cachedUser = JSON.parse(localStorage.getItem('user_info') || '{}');
+        delete cachedUser.masterCard;
+        localStorage.setItem('user_info', JSON.stringify(cachedUser));
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        return;
+      }
+
+      const data = await res.json();
+      setModalConfig({
+        isOpen: true,
+        title: 'RESET FAILED',
+        message: data.error || '主牌紀錄刪除失敗，請稍後再試。',
+        confirmText: '我知道了',
+        cancelText: '',
+        type: 'danger',
+        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+      });
+    } catch (err) {
+      console.error('主牌刪除失敗:', err);
+    }
+  };
+
   // 根據搜尋條件動態過濾收藏清單
   const filteredFav = favItems.filter(item => {
     const matchSearch = (item.title || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -680,6 +779,43 @@ export default function ProfilePage() {
               {activeSection === 'appearance' && (
                 <SectionWrapper key="data_vault" label="DATA CENTER — ARCHIVE EXPORT" title="星辰數據金庫">
 
+                  <div style={styles.masterCardVault}>
+                    <div style={styles.masterCardVisual}>
+                      {masterCardEntry ? (
+                        <img
+                          src={masterCardEntry.imageUrl}
+                          alt={masterCardEntry.name}
+                          style={styles.masterCardImage}
+                          onError={(event) => {
+                            event.currentTarget.src = TAROT_CARD_BACK_URL;
+                          }}
+                        />
+                      ) : (
+                        <div style={styles.masterCardEmptyImage}>?</div>
+                      )}
+                    </div>
+                    <div style={styles.masterCardInfo}>
+                      <span style={styles.masterCardKicker}>SOUL MASTER CARD</span>
+                      <h3 style={styles.masterCardTitle}>{masterCardEntry?.name || '尚未抽取主牌'}</h3>
+                      <p style={styles.masterCardText}>
+                        {masterCardEntry
+                          ? '這張牌會作為塔羅抽牌與 AI 解讀時的核心底色。'
+                          : '進入塔羅即時占卜時，系統會引導你先抽取靈魂主牌。'}
+                      </p>
+                    </div>
+                    {masterCardEntry && (
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.04, borderColor: '#ff4d6d', color: '#fff', boxShadow: '0 0 18px rgba(255,77,109,0.28)' }}
+                        whileTap={{ scale: 0.96 }}
+                        style={styles.masterCardDeleteBtn}
+                        onClick={triggerDeleteMasterCard}
+                      >
+                        <Trash2 size={15} /> 刪除主牌
+                      </motion.button>
+                    )}
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '30px' }}>
                     <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(188, 19, 254, 0.1)', padding: '20px', borderRadius: '6px', textAlign: 'center' }}>
                       <h5 style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', letterSpacing: '1px', margin: '0 0 10px 0' }}>星軌探索次數</h5>
@@ -892,6 +1028,50 @@ const styles = {
   favType: { fontSize: '0.8rem', color: '#bc13fe', letterSpacing: '1px', fontWeight: 'bold' },
   favTitle: { margin: '8px 0', fontSize: '1rem' },
   favDate: { fontSize: '0.85rem', letterSpacing: '1.5px' },
+  masterCardVault: {
+    display: 'grid',
+    gridTemplateColumns: '96px minmax(0, 1fr) auto',
+    gap: '22px',
+    alignItems: 'center',
+    marginBottom: '28px',
+    padding: '18px 22px',
+    borderRadius: '10px',
+    border: '1px solid rgba(212,175,55,0.22)',
+    background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(188,19,254,0.05), rgba(0,0,0,0.26))',
+    boxShadow: 'inset 0 0 24px rgba(212,175,55,0.045), 0 0 24px rgba(188,19,254,0.08)'
+  },
+  masterCardVisual: {
+    width: '78px',
+    height: '130px',
+    borderRadius: '7px',
+    border: '1px solid rgba(212,175,55,0.35)',
+    background: 'rgba(0,0,0,0.35)',
+    overflow: 'hidden',
+    display: 'grid',
+    placeItems: 'center',
+    boxShadow: '0 0 18px rgba(212,175,55,0.16)'
+  },
+  masterCardImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  masterCardEmptyImage: { color: '#d4af37', fontSize: '2rem', fontFamily: 'Cinzel, serif' },
+  masterCardInfo: { minWidth: 0 },
+  masterCardKicker: { color: '#d4af37', letterSpacing: '0.28em', fontSize: '0.68rem' },
+  masterCardTitle: { margin: '8px 0', color: '#fff', fontSize: '1.35rem', letterSpacing: '0.08em', fontFamily: 'Cinzel, serif' },
+  masterCardText: { margin: 0, color: 'rgba(255,255,255,0.62)', fontSize: '0.86rem', lineHeight: 1.7 },
+  masterCardDeleteBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    minWidth: '112px',
+    height: '38px',
+    borderRadius: '6px',
+    border: '1px solid rgba(255,77,109,0.34)',
+    background: 'rgba(255,77,109,0.05)',
+    color: '#ff8aa0',
+    cursor: 'pointer',
+    fontSize: '0.78rem',
+    letterSpacing: '0.08em'
+  },
 
   // 客製化 Select
   selectWrapper: { position: 'relative', width: '100%' },

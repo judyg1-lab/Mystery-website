@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo } from 'react';
 import { Search, History, Sparkles, Download, Heart } from 'lucide-react';
 import { useNavigate,useLocation} from 'react-router-dom';
-import { Pencil,ChevronLeft } from 'lucide-react';
+import { Pencil, ChevronLeft, Trash2 } from 'lucide-react';
 import ProfileIcon from '../ProfileIcon';
 import BackBtn from '../backBtn';
 import MysticModal from '../MysticModal';
@@ -41,6 +41,28 @@ const COLORS = {
   accentBlue: '#4fb8d6',
   textGray: '#b0b0b0',
   border: 'rgba(255, 255, 255, 0.2)'
+};
+
+const renameModalLabel = {
+  display: 'grid',
+  gap: '10px',
+  color: 'rgba(255,255,255,0.72)',
+  fontSize: '0.86rem',
+  letterSpacing: '0.12em'
+};
+
+const renameModalInput = {
+  width: '100%',
+  boxSizing: 'border-box',
+  height: 42,
+  borderRadius: 6,
+  border: '1px solid rgba(188,19,254,0.42)',
+  background: 'rgba(255,255,255,0.08)',
+  color: '#fff',
+  padding: '0 12px',
+  outline: 'none',
+  fontFamily: "'Noto Serif TC', serif",
+  letterSpacing: '0.06em'
 };
 
 class StarDust {
@@ -143,7 +165,7 @@ const parseTarotCardEntries = (content = '') => {
     .map((chunk, index) => {
       const titleEnd = chunk.search(/[。.\n]/);
       const rawTitle = titleEnd > -1 ? chunk.slice(0, titleEnd).trim() : chunk.slice(0, 48).trim();
-      const titleMatch = rawTitle.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+      const titleMatch = rawTitle.match(/^(.+?)\s+[-–—]\s+(.+)$/);
       const title = titleMatch ? titleMatch[2].trim() : rawTitle;
       const meaning = titleEnd > -1 ? chunk.slice(titleEnd + 1).trim() : chunk;
       return {
@@ -163,6 +185,18 @@ const splitReadableText = (content = '') =>
     .map(text => text.trim())
     .filter(Boolean);
 
+const parseTarotHistoryContent = (content = '') => {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed?.type === 'tarot_reading' && Array.isArray(parsed.cards)) return parsed;
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+const formatArchiveTitle = (title = '') => title.replace(/([:：])\s*/, '$1\n');
+
 const TarotCardVisual = ({ item, entry }) => (
   <div style={tarotCardShell}>
     <div style={tarotImageFrame}>
@@ -177,11 +211,99 @@ const TarotCardVisual = ({ item, entry }) => (
     </div>
     <div style={tarotCardCaption}>
       <div style={tarotCardTop}>THOTH</div>
-      <div style={tarotCardName}>{entry?.name || item?.title || 'ARCANA'}</div>
       <div style={tarotCardMeta}>{entry?.orbit || item?.category || 'MYSTIC CODEX'}</div>
     </div>
   </div>
 );
+
+const TarotHistoryReport = ({ record, reading, cards, onCardOpen }) => {
+  const spreadName = reading?.spread?.name || record?.title || 'Tarot Reading';
+  const dateText = record?.date || '';
+  const soulMaster = reading?.soulMaster || '未記錄主牌';
+  const question = reading?.question || record?.title || '未填寫';
+  const displayedCards = cards.length ? cards : [];
+
+  return (
+    <article style={tarotHistoryReport}>
+      <div style={tarotHistoryFrameGlow} />
+      <header style={tarotHistoryHeader}>
+        <div>
+          <div style={tarotHistoryKicker}>REPORT - {dateText}</div>
+          <h1 style={tarotHistoryTitle}>{spreadName}</h1>
+          <div style={tarotHistoryMetaRow}>
+            <span>主牌：{soulMaster}</span>
+            <span>問題：{question}</span>
+          </div>
+        </div>
+        <Heart size={26} color="#d4af37" style={tarotHistoryHeart} />
+      </header>
+
+      <div style={tarotHistoryGrid}>
+        <section style={tarotHistorySpreadPanel}>
+          <div style={tarotHistorySectionTitle}><span />THE SPREAD<span /></div>
+          <div style={tarotHistoryCardRow}>
+            {displayedCards.map((card, index) => {
+              const imageUrl = card.imageUrl || card.card?.imageUrl || '';
+              return (
+                <button
+                  key={`${card.position}-${card.name}-${index}`}
+                  type="button"
+                  style={tarotHistoryCardButton}
+                  onClick={() => onCardOpen?.({
+                    name: card.name,
+                    card: card.card,
+                    meaning: card.meaning,
+                    orbit: card.subtitle || `POSITION ${card.position}`
+                  })}
+                >
+                  <span style={tarotHistoryPositionBadge}>{card.position || index + 1}</span>
+                  <img
+                    src={imageUrl ? getAssetUrl(imageUrl) : TAROT_CARD_BACK_URL}
+                    alt={card.name}
+                    style={tarotHistoryCardImage}
+                    onError={(event) => {
+                      event.currentTarget.src = TAROT_CARD_BACK_URL;
+                    }}
+                  />
+                  <strong>{card.name}</strong>
+                  <small>{card.subtitle || `Position ${card.position || index + 1}`}</small>
+                </button>
+              );
+            })}
+          </div>
+          <div style={tarotHistoryOracle}>
+            <b>FINAL ORACLE</b>
+            <p>{question}</p>
+          </div>
+        </section>
+
+        <section style={tarotHistoryAnalysisPanel}>
+          <div style={tarotHistorySectionTitle}><span />CARD ANALYSIS<span /></div>
+          {displayedCards.map((card, index) => (
+            <div key={`${card.name}-analysis-${index}`} style={tarotHistoryAnalysisItem}>
+              <img
+                src={(card.imageUrl || card.card?.imageUrl) ? getAssetUrl(card.imageUrl || card.card?.imageUrl) : TAROT_CARD_BACK_URL}
+                alt={card.name}
+                style={tarotHistoryAnalysisImage}
+                onError={(event) => {
+                  event.currentTarget.src = TAROT_CARD_BACK_URL;
+                }}
+              />
+              <div>
+                <div style={tarotHistoryAnalysisTitle}>
+                  <span>{card.position || index + 1}</span>
+                  <h3>{card.name}</h3>
+                </div>
+                {card.subtitle && <b style={tarotHistoryAnalysisSubtitle}>{card.subtitle}</b>}
+                <p>{card.meaning || '這張牌保留直覺解讀空間，請依照當下問題與主牌脈絡延伸。'}</p>
+              </div>
+            </div>
+          ))}
+        </section>
+      </div>
+    </article>
+  );
+};
 
 const TarotCardDetailOverlay = ({ entry, onClose }) => {
   const title = entry?.card?.title || entry?.name || 'THOTH ARCANA';
@@ -245,6 +367,7 @@ export default function TarotPage() {
   const [activeTab, setActiveTab] = useState('origins');
   const [drawingView, setDrawingView] = useState('home');
   const [drawingBackHandler, setDrawingBackHandler] = useState(null);
+  const [isShuffleImmersive, setIsShuffleImmersive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const hasHandledProfileJump = useRef(false);
 
@@ -258,11 +381,12 @@ export default function TarotPage() {
   //if activeTab is 'drawing', we don't need to fetch articles, just return early. Otherwise, we fetch real articles from the database based on the active tab
   useEffect(() => {
     if (activeTab !== 'origins' && activeTab !== 'codex') return;
+    setArticles([]);
     const fetchRealArticles = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/tarot/articles?tabType=${activeTab}`);
         const data = await res.json();
-        if (res.ok) {setArticles(data);}
+        if (res.ok) {setArticles(Array.isArray(data) ? data : []);}
       } catch (err) {
         console.error("隤輸瑼?摨怠???", err);
       }
@@ -311,9 +435,9 @@ export default function TarotPage() {
   }, [isDrawingRoute]);
 
   const handleTopBack = useCallback(() => {
-    if (isDrawingRoute && drawingBackHandler?.()) return;
+    if ((isDrawingRoute || activeTab === 'drawing') && drawingBackHandler?.()) return;
     navigate(-1);
-  }, [drawingBackHandler, isDrawingRoute, navigate]);
+  }, [activeTab, drawingBackHandler, isDrawingRoute, navigate]);
 
   useEffect(() => {
     if (hasHandledProfileJump.current) return;
@@ -389,8 +513,13 @@ export default function TarotPage() {
   }, [fetchHistoryLogs]);
 
   const [modalConfig, setModalConfig] = useState({
-    isOpen: false, title: '', message: '', confirmText: '蝣箄?', cancelText: '??', type: 'info', onConfirm: () => {}
+    isOpen: false, title: '', message: '', confirmText: '確認', cancelText: '取消', type: 'info', mode: null, onConfirm: () => {}
   });
+  const [renameDraft, setRenameDraft] = useState('');
+
+  const closeMysticModal = useCallback(() => {
+    setModalConfig(prev => ({ ...prev, isOpen: false, mode: null }));
+  }, []);
 
   // we take the real articles from the database, and for each article we check if its ID exists in the user's favorites (dbFavorites) to determine if it should be marked as isFavorite: true or false.
   // This way, when we render the list of articles, we can show which ones are already favorited by the user.
@@ -485,6 +614,18 @@ export default function TarotPage() {
     })),
     [tarotCardEntries, tarotCardByName]
   );
+  const selectedTarotHistory = useMemo(
+    () => selectedType === 'history' ? parseTarotHistoryContent(selectedHistory?.content) : null,
+    [selectedHistory?.content, selectedType]
+  );
+  const selectedTarotHistoryCards = useMemo(
+    () => (selectedTarotHistory?.cards || []).map((card) => ({
+      ...card,
+      card: tarotCardByName.get(normalizeTarotName(card.slug)) || tarotCardByName.get(normalizeTarotName(card.name)) || null
+    })),
+    [selectedTarotHistory, tarotCardByName]
+  );
+  const showArchiveHeroCard = activeTab === 'origins';
   const readableParagraphs = selectedItem ? splitReadableText(selectedItem.content) : [];
   const codexIntro = selectedItem ? getCodexIntro(selectedItem.content) : '';
 
@@ -565,6 +706,110 @@ export default function TarotPage() {
     }
   };
 
+  const executeRenameHistory = async (rec) => {
+    const token = localStorage.getItem("mystic_token");
+    if (!token) return;
+
+    const nextTitle = renameDraft.trim();
+    if (!nextTitle || nextTitle === rec.title) {
+      closeMysticModal();
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/history/tarot/${rec.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: nextTitle.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.history) {
+        setHistoryLogs(prev => prev.map(log => log.id === rec.id ? data.history : log));
+        closeMysticModal();
+      } else {
+        setModalConfig({
+          isOpen: true,
+          title: '重新命名失敗',
+          message: data.error || '目前無法更新這筆塔羅紀錄名稱。',
+          confirmText: '我知道了',
+          cancelText: '',
+          type: 'error',
+          mode: null,
+          onConfirm: closeMysticModal
+        });
+      }
+    } catch (err) {
+      console.error('Rename tarot history failed:', err);
+    }
+  };
+
+  const handleRenameHistory = (e, rec) => {
+    if (e) e.stopPropagation();
+    setRenameDraft(rec.title || '');
+    setModalConfig({
+      isOpen: true,
+      title: '重新命名塔羅紀錄',
+      message: '',
+      confirmText: '儲存',
+      cancelText: '取消',
+      type: 'info',
+      mode: 'rename',
+      onConfirm: () => executeRenameHistory(rec)
+    });
+  };
+
+  const executeDeleteHistory = async (rec) => {
+    const token = localStorage.getItem("mystic_token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/history/tarot/${rec.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setHistoryLogs(prev => prev.filter(log => log.id !== rec.id));
+        if (selectedItemId === rec.id) {
+          setSelectedItemId(null);
+          setSelectedType(null);
+        }
+        await fetchUserFavorites();
+        closeMysticModal();
+      } else {
+        const data = await res.json();
+        setModalConfig({
+          isOpen: true,
+          title: '刪除失敗',
+          message: data.error || '目前無法刪除這筆塔羅紀錄。',
+          confirmText: '我知道了',
+          cancelText: '',
+          type: 'error',
+          mode: null,
+          onConfirm: closeMysticModal
+        });
+      }
+    } catch (err) {
+      console.error('Delete tarot history failed:', err);
+    }
+  };
+
+  const handleDeleteHistory = (e, rec) => {
+    if (e) e.stopPropagation();
+    setModalConfig({
+      isOpen: true,
+      title: '刪除塔羅紀錄',
+      message: `確定要刪除「${rec.title || '未命名紀錄'}」這筆塔羅紀錄嗎？`,
+      confirmText: '刪除',
+      cancelText: '取消',
+      type: 'danger',
+      mode: null,
+      onConfirm: () => executeDeleteHistory(rec)
+    });
+  };
+
 
   return (
     <div style={mainLayout}>
@@ -572,20 +817,32 @@ export default function TarotPage() {
       <UniverseCanvas />
       <MysticModal
         isOpen={modalConfig.isOpen}
-        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onClose={closeMysticModal}
         onConfirm={modalConfig.onConfirm}
         title={modalConfig.title}
         message={modalConfig.message}
         confirmText={modalConfig.confirmText}
         cancelText={modalConfig.cancelText}
         type={modalConfig.type}
-      />
+      >
+        {modalConfig.mode === 'rename' && (
+          <label style={renameModalLabel}>
+            <span>新的紀錄名稱</span>
+            <input
+              value={renameDraft}
+              onChange={(event) => setRenameDraft(event.target.value)}
+              style={renameModalInput}
+              autoFocus
+            />
+          </label>
+        )}
+      </MysticModal>
       <TarotCardDetailOverlay
         entry={selectedTarotEntry}
         onClose={() => setSelectedTarotEntry(null)}
       />
 
-      <nav style={topNavBar}>
+      <nav style={{ ...topNavBar, display: isShuffleImmersive ? 'none' : 'flex' }}>
         <div style={{ display:'flex', alignItems:'center',gap:'25px'}}>
             <BackBtn onClick={handleTopBack} />
             <div style={navBrandStyle} onClick={() => navigate('/maindashboard')}>MYSTIC ARCHIVE</div></div>
@@ -602,6 +859,7 @@ export default function TarotPage() {
                                 setSelectedItemId(null);
                                 setSelectedType(null);
                                 setSelectedTarotEntry(null);
+                                setIsShuffleImmersive(false);
                       }}
               onMouseEnter={(e) => {
                 if (activeTab !== tab) {e.currentTarget.style.color = '#bc13fe';
@@ -651,7 +909,7 @@ export default function TarotPage() {
       </nav>
 
       {/* 銝餉??批捆???*/}
-      <main style={contentArea}>
+      <main style={isShuffleImmersive ? immersiveContentArea : contentArea}>
         {(activeTab === 'origins' || activeTab === 'codex') && (
           <div style={flexLayout}>
             <div style={sidebarWrapper}>
@@ -660,6 +918,9 @@ export default function TarotPage() {
                 <input placeholder="搜尋..." style={searchInput} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <div style={sidebarList}>
+                {filteredData.length === 0 && (
+                  <div style={emptyHint}>尚無可顯示的塔羅檔案</div>
+                )}
                 {filteredData.map(item => (
                   <div
                       key={`${activeTab}-${item.id}`}
@@ -706,17 +967,33 @@ export default function TarotPage() {
               <AnimatePresence mode="wait">
                 {selectedItem ? (
                   <motion.div key={selectedItem.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={detailPanel}>
-                    <div style={activeTab === 'codex' ? articleHeroTextOnly : articleHeroGrid}>
-                      {activeTab !== 'codex' && <TarotCardVisual item={selectedItem} entry={hydratedTarotCardEntries[0]} />}
-                      <div style={articleHeaderBlock}>
+                    <div style={showArchiveHeroCard ? archiveHeroLayout : archiveHeroTextOnly}>
+                      {showArchiveHeroCard && (
+                        <div style={archiveCardColumn}>
+                          <img src="/assets/tarot/spread-frame.png" alt="" style={archiveSpreadFrameImage} />
+                          <TarotCardVisual item={selectedItem} entry={hydratedTarotCardEntries[0]} />
+                          <div style={archiveCardInfo}>
+                            <div style={archiveCardCategory}>{selectedItem.category}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={showArchiveHeroCard ? archiveHeaderBlock : archiveHeaderBlockTextOnly}>
                         <div style={metaRow}>
                           <span style={categoryPill}>{selectedItem.category}</span>
                           <span style={sectionLabel}>{activeTab.toUpperCase()}</span>
                         </div>
+
                         <h2 style={goldLabel}>THOTH ARCHIVE</h2>
-                        <h1 style={mainTitle}>{selectedItem.title}</h1>
-                        <div style={divider} />
-                        <p style={detailLead}>{codexIntro || selectedItem.detail}</p>
+                        <h1 style={archiveTitle}>{formatArchiveTitle(selectedItem.title)}</h1>
+
+                        <div style={ornamentDivider}>
+                          <span style={ornamentLine} />
+                          <i style={ornamentStar}>✦</i>
+                          <span style={ornamentLine} />
+                        </div>
+
+                        <p style={archiveLead}>{codexIntro || selectedItem.detail}</p>
                       </div>
                     </div>
 
@@ -764,9 +1041,18 @@ export default function TarotPage() {
                         </div>
                       </>
                     ) : (
-                      <div style={paragraphPanel}>
+                      <div style={archiveBodyPanel}>
                         {readableParagraphs.map((paragraph, index) => (
-                          <p key={index} style={detailText}>{paragraph}</p>
+                          <p key={index} style={index === 0 ? archiveFirstParagraph : archiveParagraph}>
+                            {index === 0 ? (
+                              <>
+                                <span style={dropCap}>{paragraph.charAt(0)}</span>
+                                {paragraph.slice(1)}
+                              </>
+                            ) : (
+                              paragraph
+                            )}
+                          </p>
                         ))}
                       </div>
                     )}
@@ -779,7 +1065,17 @@ export default function TarotPage() {
 
         {/* --- 蝺??賜?雿???朣?--- */}
         {activeTab === 'drawing' && (
-          <TarotDrawingSystem cardBackUrl={TAROT_CARD_BACK_URL} onBackHandlerChange={setDrawingBackHandler} />
+          <TarotDrawingSystem
+            cardBackUrl={TAROT_CARD_BACK_URL}
+            onBackHandlerChange={setDrawingBackHandler}
+            onImmersiveChange={setIsShuffleImmersive}
+            onHistoryCreated={(history) => {
+              if (history) {
+                setHistoryLogs(prev => [history, ...prev.filter(log => log.id !== history.id)]);
+              }
+              fetchHistoryLogs();
+            }}
+          />
 )}
 
         {activeTab === 'history' && (
@@ -815,13 +1111,27 @@ export default function TarotPage() {
                           <div style={itemTitle}>{rec.title}</div>
                         </div>
                       </div>
-                      <Pencil size={16} color="#666" style={{ cursor:'pointer', transition:'0.3s'}}
+                      <Pencil
+                            size={16}
+                            color="#666"
+                            style={{ cursor:'pointer', transition:'0.3s', fill: 'none', stroke: '#666'}}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => handleRenameHistory(e, rec)}
                             onMouseEnter={(e)=>{e.currentTarget.style.fill ='#a2003e';
                                                 e.currentTarget.style.stroke ='#a2003e';
                                                 e.currentTarget.style.filter='drop-shadow(0 0 10px #a2003e)';}}
-                            onMouseLeave={(e)=>{e.currentTarget.style.fill =rec.isFavorite ? '#a2003e' : '#555';
-                                                e.currentTarget.style.stroke =rec.isFavorite ? '#a2003e' : '#555';
-                                                e.currentTarget.style.filter=rec.isFavorite? 'drop-shadow(0 0 10px #a2003e)': 'none';}}/> {/*drop-shadow(x y blur color)*/}
+                            onMouseLeave={(e)=>{e.currentTarget.style.fill ='none';
+                                                e.currentTarget.style.stroke ='#666';
+                                                e.currentTarget.style.filter='none';}}/> {/*drop-shadow(x y blur color)*/}
+                      <motion.div
+                        whileHover={{ scale: 1.15, filter: 'drop-shadow(0 0 8px #ff4d6d)' }}
+                        whileTap={{ scale: 0.9 }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => handleDeleteHistory(e, rec)}
+                        style={{ cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Trash2 size={17} color="#666" style={{ transition: '0.2s' }} />
+                      </motion.div>
                       <motion.div
                         whileHover={{ scale: 1.15, filter: 'drop-shadow(0 0 8px #bc13fe)' }}
                         whileTap={{ scale: 0.9 }}
@@ -846,14 +1156,25 @@ export default function TarotPage() {
                 <AnimatePresence mode="wait">
                   {selectedItem ? (
                     <motion.div key={selectedItem.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                      <h2 style={goldLabel}>REPORT - {selectedItem.date}</h2>
-                      <h1 style={mainTitle}>{selectedItem.title}</h1>
-                      <div style={divider} />
-                      <p style={detailText}>{selectedItem.content}</p>
-                      <button style={invokeGateBtn}>
-                        <Download size={16}/>
-                        匯出結果
-                      </button>
+                      {selectedType === 'history' && selectedTarotHistory ? (
+                        <TarotHistoryReport
+                          record={selectedItem}
+                          reading={selectedTarotHistory}
+                          cards={selectedTarotHistoryCards}
+                          onCardOpen={setSelectedTarotEntry}
+                        />
+                      ) : (
+                        <>
+                          <h2 style={goldLabel}>REPORT - {selectedItem.date}</h2>
+                          <h1 style={mainTitle}>{selectedItem.title}</h1>
+                          <div style={divider} />
+                          <p style={detailText}>{selectedItem.content}</p>
+                          <button style={invokeGateBtn}>
+                            <Download size={16}/>
+                            匯出結果
+                          </button>
+                        </>
+                      )}
                     </motion.div>
                   ) : (
                     <div style={emptyHint}>
@@ -871,7 +1192,7 @@ export default function TarotPage() {
 
 // ================= Styles =================
 
-const mainLayout = { width: '100%',height:'100vh', background: '#050208', color: '#fff', position: 'relative', overflow: 'hidden', fontFamily: 'Cinzel, serif' };
+const mainLayout = { width: '100%',height:'100vh', background: '#050208', color: '#fff', position: 'relative', overflow: 'hidden', overscrollBehavior: 'none', fontFamily: 'Cinzel, serif' };
 const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 };
 
 const topNavBar = {
@@ -887,19 +1208,204 @@ const activeTabBtn = { ...tabBtn, color: '#fff' };
 const activeUnderline = { position: 'absolute', bottom: -8, left: 0, right: 0, height: '2px', background: '#bc13fe', boxShadow: '0 0 10px #bc13fe' };
 const subLabel = {fontSize: '0.7rem',color: '#666',letterSpacing: '2px',marginTop: '4px'};
 
-const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2 ,overflow: 'visible'};
-const flexLayout = { display: 'flex',  height: 'calc(100vh - 80px)', padding: '25px 40px', gap: '25px', alignItems: 'stretch' };
+const contentArea = { paddingTop: '80px', height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'hidden', boxSizing: 'border-box' };
+const immersiveContentArea = { height: '100vh', width: '100%', position: 'relative', zIndex: 2, overflow: 'hidden', boxSizing: 'border-box' };
+const flexLayout = { display: 'flex',  height: 'calc(100vh - 118px)', padding: '16px 40px 0', gap: '25px', alignItems: 'stretch' };
 
 const sidebarWrapper = {
-  width: '320px', flexShrink: 0, background: 'rgba(0, 0, 0, 0.4)', borderRadius: '16px',
-  padding: '20px', border: '1px solid rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(3px)',
-  display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)',overflowY: 'auto',minHeight: 0
+  width: '320px', flexShrink: 0, background: 'rgba(0, 0, 0, 0.38)', borderRadius: '8px',
+  padding: '20px', border: '1px solid rgba(188,19,254,0.14)', backdropFilter: 'blur(3px)',
+  display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', minHeight: 0
 };
 
 const detailWrapper = {
-  flex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', background: 'rgba(0, 0, 0, 0.4)',
-  borderRadius: '16px', padding: '28px 48px', border: '1px solid rgba(255, 255, 255, 0.08)',
-  backdropFilter: 'blur(1px)'
+  flex: 1, height: '100%', overflowY: 'auto', background: 'rgba(0, 0, 0, 0.22)',
+  borderRadius: '8px', padding: '0px 50px', border: '1px solid rgba(188,19,254,0.14)',
+  backdropFilter: 'blur(1px)', boxShadow: 'inset 0 0 28px rgba(188,19,254,0.08)'
+};
+const tarotHistoryReport = {
+  position: 'relative',
+  minHeight: 'calc(100vh - 170px)',
+  padding: '30px 34px',
+  border: '1px solid rgba(212,175,55,0.24)',
+  borderRadius: '8px',
+  background: [
+    'radial-gradient(circle at 28% 42%, rgba(188,19,254,0.12), transparent 34%)',
+    'radial-gradient(circle at 78% 24%, rgba(212,175,55,0.1), transparent 28%)',
+    'rgba(4,1,8,0.58)'
+  ].join(', '),
+  boxShadow: 'inset 0 0 44px rgba(212,175,55,0.05), 0 0 30px rgba(188,19,254,0.12)',
+  overflow: 'hidden'
+};
+const tarotHistoryFrameGlow = {
+  position: 'absolute',
+  inset: '14px',
+  border: '1px solid rgba(212,175,55,0.12)',
+  borderRadius: '6px',
+  pointerEvents: 'none',
+  boxShadow: 'inset 0 0 30px rgba(188,19,254,0.08)'
+};
+const tarotHistoryHeader = {
+  position: 'relative',
+  zIndex: 1,
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: '28px',
+  alignItems: 'flex-start',
+  padding: '0 8px 24px',
+  borderBottom: '1px solid rgba(212,175,55,0.16)'
+};
+const tarotHistoryKicker = {
+  color: '#d4af37',
+  letterSpacing: '0.42em',
+  fontSize: '0.72rem',
+  marginBottom: '12px'
+};
+const tarotHistoryTitle = {
+  margin: 0,
+  color: '#f5ead8',
+  fontFamily: 'Cinzel, serif',
+  fontSize: 'clamp(2rem, 3.2vw, 3.8rem)',
+  letterSpacing: '0.12em',
+  lineHeight: 1
+};
+const tarotHistoryMetaRow = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '14px 28px',
+  marginTop: '18px',
+  color: 'rgba(255,255,255,0.72)',
+  fontFamily: "'Noto Serif TC', serif",
+  fontSize: '0.94rem',
+  letterSpacing: '0.06em'
+};
+const tarotHistoryHeart = {
+  flex: '0 0 auto',
+  padding: '10px',
+  border: '1px solid rgba(212,175,55,0.34)',
+  borderRadius: '50%',
+  filter: 'drop-shadow(0 0 12px rgba(212,175,55,0.34))'
+};
+const tarotHistoryGrid = {
+  position: 'relative',
+  zIndex: 1,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.05fr) minmax(360px, 0.9fr)',
+  gap: '30px',
+  paddingTop: '28px'
+};
+const tarotHistorySpreadPanel = {
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'start',
+  gap: '24px',
+  paddingRight: '4px'
+};
+const tarotHistorySectionTitle = {
+  display: 'grid',
+  gridTemplateColumns: '1fr auto 1fr',
+  alignItems: 'center',
+  gap: '12px',
+  color: '#d4af37',
+  letterSpacing: '0.32em',
+  fontSize: '0.78rem',
+  textAlign: 'center'
+};
+const tarotHistoryCardRow = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'flex-start',
+  flexWrap: 'wrap',
+  gap: '24px'
+};
+const tarotHistoryCardButton = {
+  position: 'relative',
+  width: '146px',
+  display: 'grid',
+  justifyItems: 'center',
+  gap: '7px',
+  padding: 0,
+  border: 0,
+  background: 'transparent',
+  color: '#d4af37',
+  cursor: 'pointer',
+  fontFamily: 'Cinzel, serif',
+  textAlign: 'center'
+};
+const tarotHistoryPositionBadge = {
+  position: 'absolute',
+  top: '-12px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  width: '30px',
+  height: '30px',
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: '50%',
+  border: '1px solid rgba(212,175,55,0.5)',
+  background: 'rgba(7,3,10,0.94)',
+  color: '#d4af37',
+  zIndex: 2
+};
+const tarotHistoryCardImage = {
+  width: '136px',
+  height: '228px',
+  objectFit: 'cover',
+  borderRadius: '7px',
+  border: '1px solid rgba(212,175,55,0.46)',
+  boxShadow: '0 0 22px rgba(212,175,55,0.16), 0 0 30px rgba(188,19,254,0.14)'
+};
+const tarotHistoryOracle = {
+  margin: '8px auto 0',
+  width: 'min(640px, 100%)',
+  padding: '18px 24px',
+  border: '1px solid rgba(212,175,55,0.24)',
+  borderRadius: '8px',
+  background: 'rgba(0,0,0,0.24)',
+  color: '#f5d889',
+  textAlign: 'center',
+  fontFamily: "'Noto Serif TC', serif",
+  letterSpacing: '0.08em',
+  lineHeight: 1.8
+};
+const tarotHistoryAnalysisPanel = {
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'start',
+  gap: '18px',
+  paddingLeft: '26px',
+  borderLeft: '1px solid rgba(212,175,55,0.16)'
+};
+const tarotHistoryAnalysisItem = {
+  display: 'grid',
+  gridTemplateColumns: '76px minmax(0, 1fr)',
+  gap: '16px',
+  alignItems: 'start',
+  paddingBottom: '16px',
+  borderBottom: '1px solid rgba(212,175,55,0.13)',
+  color: 'rgba(255,255,255,0.78)',
+  fontFamily: "'Noto Serif TC', serif",
+  lineHeight: 1.75
+};
+const tarotHistoryAnalysisImage = {
+  width: '74px',
+  height: '124px',
+  objectFit: 'cover',
+  borderRadius: '5px',
+  border: '1px solid rgba(212,175,55,0.36)'
+};
+const tarotHistoryAnalysisTitle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  color: '#f5ead8',
+  letterSpacing: '0.12em'
+};
+const tarotHistoryAnalysisSubtitle = {
+  display: 'block',
+  color: '#bc13fe',
+  margin: '6px 0 4px',
+  letterSpacing: '0.08em'
 };
 
 const searchBox = { display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255, 255, 255, 0.05)', padding: '12px 18px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: '20px' };
@@ -925,7 +1431,15 @@ const invokeGateBtn = { ...invokeGlassBtn, background: '#fff', color: '#000', bo
 
 const catTag = { fontSize: '0.75rem', color: '#bc13fe', letterSpacing: '2px', fontWeight: 'bold' };
 const goldLabel = { color: '#d4af37', letterSpacing: '6px', fontSize: '0.7rem', marginBottom: '15px', fontFamily: 'Cinzel' };
-const mainTitle = { fontSize: 'clamp(1.75rem, 3.2vw, 3rem)', letterSpacing: '4px', margin: 0, lineHeight: 1.08 };
+const mainTitle = {
+  fontFamily: '"Noto Serif TC", "Songti TC", "PMingLiU", "Cinzel", serif',
+  fontSize: 'clamp(1.5rem, 3vw, 3.5rem)',
+  fontWeight: 400,
+  letterSpacing: '2px',
+  margin: 0,
+  lineHeight: 1.18,
+  color: 'rgba(245,238,222,0.92)'
+};
 const divider = { width: '60px', height: '2px', background: '#bc13fe', margin: '24px 0' };
 const detailPanel = { maxWidth: '1120px', margin: '0 auto', paddingBottom: '48px' };
 const articleHeroGrid = { display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr)', gap: '42px', alignItems: 'center', marginBottom: '34px' };
@@ -935,8 +1449,8 @@ const metaRow = { display: 'flex', alignItems: 'center', gap: '12px', marginBott
 const categoryPill = { color: '#fff', background: 'rgba(188,19,254,0.16)', border: '1px solid rgba(188,19,254,0.35)', borderRadius: '4px', padding: '7px 10px', fontSize: '0.68rem', letterSpacing: '2px' };
 const sectionLabel = { color: '#777', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '7px 10px', fontSize: '0.68rem', letterSpacing: '2px' };
 const detailLead = { fontSize: '1rem', lineHeight: 1.85, color: 'rgba(255,255,255,0.68)', margin: 0, fontFamily: 'Inter, sans-serif', maxWidth: '720px' };
-const tarotCardShell = { width: '100%', maxWidth: '260px' };
-const tarotImageFrame = { aspectRatio: '2 / 3', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 0 28px rgba(188,19,254,0.24), inset 0 0 24px rgba(255,255,255,0.08)', background: '#09040d' };
+const tarotCardShell = { width: '100%', maxWidth: '150px', position: 'relative', zIndex: 2 };
+const tarotImageFrame = { aspectRatio: '2 / 3', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(212,175,55,0.28)', boxShadow: '0 0 28px rgba(188,19,254,0.24), inset 0 0 24px rgba(255,255,255,0.08)', background: '#09040d' };
 const tarotCardImage = { width: '100%', height: '100%', display: 'block', objectFit: 'cover' };
 const tarotCardCaption = { paddingTop: '14px', textAlign: 'center' };
 const tarotCardTop = { color: '#d4af37', fontSize: '0.68rem', letterSpacing: '5px', marginBottom: '8px' };
@@ -1022,7 +1536,8 @@ const tarotDetailMeaningLine = {
   fontFamily: 'Inter, sans-serif',
   fontSize: '1rem',
   lineHeight: 1.9,
-  letterSpacing: '0.6px'
+  letterSpacing: '0.6px',
+  textAlign: 'center'
 };
 const paragraphPanel = { display: 'grid', gap: '14px', maxWidth: '820px' };
 const detailText = { fontSize: '1rem', lineHeight: '1.9', color: 'rgba(255, 255, 255, 0.78)', margin: 0, fontFamily: 'Inter, sans-serif' };
@@ -1030,6 +1545,183 @@ const detailText = { fontSize: '1rem', lineHeight: '1.9', color: 'rgba(255, 255,
 const backBtnStyle = { marginTop:'auto', paddingTop: '20px',background: 'none', border: 'none', color: '#bc13fe', cursor: 'pointer', textAlign: 'left', fontFamily: 'Cinzel', fontSize: '0.7rem' };
 const sidebarHeader = { padding: '0 10px 20px', fontFamily: 'Cinzel', letterSpacing: '4px', color: '#d4af37', fontSize: '0.8rem' };
 const emptyHint = { textAlign: 'center', marginTop: '180px', color: '#333', letterSpacing: '5px' };
+
+const archiveHeroLayout = {
+  display: 'grid',
+  gridTemplateColumns: '250px minmax(0, 1fr)',
+  gap: '50px',
+  alignItems: 'center',
+  marginBottom: '25px',
+  padding: '16px 6px 0px',
+  borderBottom: '1px solid rgba(212,175,55,0.16)'
+};
+
+const archiveHeroTextOnly = {
+  display: 'flex',
+  alignItems: 'center',
+  minHeight: '310px',
+  maxWidth: '980px',
+  margin: '0 auto 34px',
+  padding: '50px 20px 40px',
+  borderBottom: '1px solid rgba(212,175,55,0.16)',
+  boxSizing: 'border-box'
+};
+
+const archiveCardColumn = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  position: 'relative',
+  padding: '18px 22px 30px',
+  border: 'none',
+  background: 'transparent',
+  boxShadow: 'none',
+  overflow: 'visible'
+};
+
+const archiveSpreadFrameImage = {
+  position: 'absolute',
+  inset: '-22px -34px -24px',
+  width: 'calc(100% + 68px)',
+  height: 'calc(100% + 46px)',
+  objectFit: 'fill',
+  pointerEvents: 'none',
+  opacity: 0.62,
+  zIndex: 0,
+  filter: 'drop-shadow(0 0 18px rgba(188,19,254,0.22)) drop-shadow(0 0 10px rgba(212,175,55,0.18))'
+};
+
+const archiveCardInfo = {
+  marginTop: '14px',
+  textAlign: 'center',
+  letterSpacing: '3px',
+  lineHeight: 1.5,
+  position: 'relative',
+  zIndex: 2
+};
+
+const archiveCardKicker = {
+  color: 'rgba(212,175,55,0.72)',
+  fontSize: '0.68rem',
+  letterSpacing: '5px',
+  marginBottom: '4px'
+};
+
+const archiveCardCategory = {
+  color: '#bc13fe',
+  fontSize: '0.78rem',
+  letterSpacing: '3px',
+  marginBottom: '18px'
+};
+
+const archiveCardArchive = {
+  color: 'rgba(212,175,55,0.75)',
+  fontSize: '0.68rem',
+  letterSpacing: '5px'
+};
+
+const archiveCardArchiveName = {
+  color: '#d4af37',
+  fontSize: '0.72rem',
+  letterSpacing: '4px',
+  marginTop: '4px'
+};
+
+const archiveHeaderBlock = {
+  minWidth: 0,
+  maxWidth: '760px',
+  alignSelf: 'center'
+};
+
+const archiveHeaderBlockTextOnly = {
+  ...archiveHeaderBlock,
+  maxWidth: '900px',
+  width: '100%',
+  padding: '0 4px'
+};
+
+const archiveTitle = {
+  fontFamily: '"Noto Serif TC", "Songti TC", "PMingLiU", "Cinzel", serif',
+  fontSize: 'clamp(1.85rem, 2.85vw, 2.95rem)',
+  fontWeight: 400,
+  lineHeight: 1.18,
+  letterSpacing: '2px',
+  margin: '14px 0 0',
+  maxWidth: '920px',
+  color: 'rgba(245,238,222,0.92)',
+  textShadow: '0 0 18px rgba(188,19,254,0.10)',
+  whiteSpace: 'pre-line'
+};
+
+const ornamentDivider = {
+  display: 'grid',
+  gridTemplateColumns: '1fr auto 1fr',
+  alignItems: 'center',
+  gap: '12px',
+  width: '100%',
+  maxWidth: '520px',
+  margin: '22px 0 20px',
+  color: '#bc13fe'
+};
+
+ornamentDivider.span = {};
+
+const archiveLead = {
+  fontFamily: '"Noto Serif TC", "Microsoft JhengHei", serif',
+  fontSize: '1rem',
+  lineHeight: 1.9,
+  letterSpacing: '0.8px',
+  color: 'rgba(255,255,255,0.72)',
+  maxWidth: '760px',
+  margin: 0
+};
+
+const archiveBodyPanel = {
+  marginTop: '32px',
+  padding: '28px 34px',
+  borderTop: '1px solid rgba(212,175,55,0.18)',
+  borderBottom: '1px solid rgba(212,175,55,0.12)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.025), rgba(188,19,254,0.025))',
+  boxShadow: 'inset 0 0 28px rgba(188,19,254,0.035)'
+};
+
+const archiveParagraph = {
+  fontFamily: '"Noto Serif TC", "Microsoft JhengHei", serif',
+  fontSize: '1.05rem',
+  lineHeight: 2.05,
+  letterSpacing: '0.8px',
+  color: 'rgba(255,255,255,0.76)',
+  margin: '0 0 18px'
+};
+
+const archiveFirstParagraph = {
+  ...archiveParagraph,
+  fontSize: '1.08rem',
+  color: 'rgba(255,255,255,0.82)'
+};
+
+const dropCap = {
+  float: 'left',
+  fontFamily: '"Noto Serif TC", "Cinzel", serif',
+  fontSize: '3.2rem',
+  lineHeight: '0.9',
+  padding: '8px 14px 4px 0',
+  color: '#d4af37',
+  textShadow: '0 0 16px rgba(188,19,254,0.35)'
+};
+
+const ornamentLine = {
+  height: '1px',
+  background: 'linear-gradient(90deg, transparent, rgba(188,19,254,0.8), rgba(212,175,55,0.35))'
+};
+
+const ornamentStar = {
+  fontStyle: 'normal',
+  color: '#bc13fe',
+  textShadow: '0 0 12px rgba(188,19,254,0.75)',
+  fontSize: '0.9rem'
+};
 
 const hideScrollbarCSS =
   `/* WebKit browsers (Chrome, Edge, Safari) */
@@ -1044,5 +1736,3 @@ const hideScrollbarCSS =
   /* Keep MS/IE from forcing hidden scrollbars (only when needed) */
   html, body { -ms-overflow-style: auto; }
 `;
-
-
