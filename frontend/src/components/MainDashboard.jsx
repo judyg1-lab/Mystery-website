@@ -12,9 +12,9 @@ const PARTICLE_COUNT = 5000;
 
 const MYSTIC_REALMS = [
   { id: 'tarot', titleEn: 'TAROT', titleZh: '托特塔羅', color: '#bc13fe', desc: 'THE MIRROR OF SOUL', path: '/tarot' },
-  { id: 'bazi', titleEn: 'BAZI', titleZh: '四柱八字', color: '#ffcc00', desc: 'RHYTHM OF FIVE ELEMENTS', path: '/bazi' },
+  { id: 'bazi', titleEn: 'BAZI', titleZh: '八字命盤', color: '#ffcc00', desc: 'RHYTHM OF FIVE ELEMENTS', path: '/bazi' },
   { id: 'ziwei', titleEn: 'ZI WEI', titleZh: '紫微斗數', color: '#00ccff', desc: 'STELLAR DESTINY COMPASS', path: '/ziwei' },
-  { id: 'astrology', titleEn: 'ASTROLOGY', titleZh: '占星命盤', color: '#00fa9a', desc: 'COSMIC BLUEPRINT', path: '/astrology' }
+  { id: 'astrology', titleEn: 'ASTROLOGY', titleZh: '西洋星盤', color: '#00fa9a', desc: 'COSMIC BLUEPRINT', path: '/astrology' }
 ];
 
 // ================= NavLink =================

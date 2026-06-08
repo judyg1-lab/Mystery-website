@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Phone, CheckCircle, ArrowRight, ArrowLeft, RefreshCw, Eye, EyeOff, ChevronLeft } from 'lucide-react';
@@ -12,6 +12,48 @@ const COLORS = {
   border: 'rgba(255, 255, 255, 0.2)'
 };
 const navBrandStyle = { color: '#d4af37', letterSpacing: '4px', fontSize: '1rem',minWidth: '250px', cursor: 'pointer',whiteSpace: 'nowrap', flexShrink: 0 };
+const TOKEN_TTL_MS = {
+  remember: 24 * 60 * 60 * 1000,
+  session: 2 * 60 * 60 * 1000
+};
+
+const COMMON_PASSWORDS = new Set([
+  'password', 'password123', '123456', '12345678', '123456789', 'qwerty', 'qwerty123',
+  'admin123', 'letmein', 'welcome', 'iloveyou', 'abc123', '111111', '000000', 'mystic123'
+]);
+
+function evaluatePassword(password) {
+  const lower = password.toLowerCase();
+  const checks = [
+    password.length >= 12,
+    /[A-Z]/.test(password),
+    /[a-z]/.test(password),
+    /\d/.test(password),
+    /[^A-Za-z0-9]/.test(password)
+  ];
+  if (COMMON_PASSWORDS.has(lower) || /^\d+$/.test(password) || /^(.)\1+$/.test(password)) {
+    return { ok: false, label: '太常見', message: '這組密碼太常見或太容易被猜到，請換一組。' };
+  }
+  if (/(.)\1{3,}/.test(password)) {
+    return { ok: false, label: '重複過多', message: '密碼不可以使用大量重複字元。' };
+  }
+  if (checks.filter(Boolean).length < 5) {
+    return { ok: false, label: '強度不足', message: '密碼至少 12 碼，並包含大小寫英文、數字與符號。' };
+  }
+  return { ok: true, label: '強度良好', message: '密碼強度良好。' };
+}
+
+function generateStrongPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const numbers = '23456789';
+  const symbols = '!@#$%^&*?';
+  const all = upper + lower + numbers + symbols;
+  const pick = (source) => source[Math.floor(Math.random() * source.length)];
+  return [pick(upper), pick(lower), pick(numbers), pick(symbols), ...Array.from({ length: 12 }, () => pick(all))]
+    .sort(() => Math.random() - 0.5)
+    .join('');
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -19,7 +61,7 @@ export default function LoginPage() {
   const [resetMethod, setResetMethod] = useState('email');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    username: '', email: '', phone: '', password: '', confirmPassword: ''
+    username: '', email: '', phone: '', password: '', confirmPassword: '', rememberMe: false
   });
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -32,82 +74,80 @@ export default function LoginPage() {
   });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
   };
+
+  const showModal = (config) => setModalConfig({
+    isOpen: true,
+    confirmText: '確認',
+    cancelText: '',
+    type: 'info',
+    onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false })),
+    ...config
+  });
 
   const handleLogin = async(e) => {
     if(e) e.preventDefault();
     if(!formData.username || !formData.password) {
-      setModalConfig({
-        isOpen: true,
-        title: 'LOGIN ERROR',
-        message: '請填寫使用者名稱與密碼',
-        confirmText: '確認',
-        cancelText: '',
-        type: 'danger',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      showModal({ title: '登入資料不足', message: '請輸入帳號與密碼。', type: 'danger' });
       return;
     }
     try{
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username: formData.username, password: formData.password})});
+        body: JSON.stringify({username: formData.username, password: formData.password, rememberMe: formData.rememberMe})});
       const data = await response.json();
       if (response.ok) {
-        localStorage.setItem('mystic_token', data.token); //key: mystic_token, value: the JWT token returned from the server upon successful login. This token will be used for authenticating subsequent API requests to protected routes.
+        const ttl = formData.rememberMe ? TOKEN_TTL_MS.remember : TOKEN_TTL_MS.session;
+        localStorage.setItem('mystic_token', data.token);
+        localStorage.setItem('mystic_token_expires_at', String(Date.now() + ttl));
         localStorage.setItem('user_info', JSON.stringify(data.user));
         navigate('/maindashboard');
       } else {
-        setModalConfig({
-          isOpen: true,
-          title: 'LOGIN FAILED',
-          message: '帳號或密碼錯誤',
-          confirmText: '確認',
-          cancelText: '',
-          type: 'danger',
-          onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-        });
+        showModal({ title: '登入失敗', message: data.error || '帳號或密碼不正確。', type: 'danger' });
       }
     } catch (error) {
-      console.error("Login Error:", error);
-      setModalConfig({
-        isOpen: true,
-        title: 'LOGIN ERROR',
-        message: '登入過程發生錯誤，請稍後再試',
-        confirmText: '確認',
-        cancelText: '',
-        type: 'danger',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      console.error('Login Error:', error);
+      showModal({ title: '登入失敗', message: '伺服器暫時無法回應，請稍後再試。', type: 'danger' });
     }
+  };
+
+  const fillGeneratedPassword = () => {
+    const password = generateStrongPassword();
+    setFormData(prev => ({ ...prev, password, confirmPassword: password }));
+    showModal({ title: '已產生安全密碼', message: '系統已為你填入一組高強度密碼。請妥善保存，之後登入會需要用到。' });
+  };
+
+  const handleGoogleRegister = () => {
+    showModal({
+      title: 'Google 註冊尚未啟用',
+      message: '要真的使用 Gmail/Google 註冊，需要先設定 Google OAuth Client ID、Client Secret 與回呼網址，並在資料庫新增 Google 帳號識別欄位。'
+    });
   };
 
   const handleRegister = async() => {
     const { username, email, phone, password, confirmPassword } = formData;
     if (!username || !email || !phone || !password) {
-      setModalConfig({
-        isOpen: true,
-        title: 'REGISTRATION ERROR',
-        message: '請填寫所有欄位以建立帳號',
-        confirmText: '確認',
-        cancelText: '',
-        type: 'danger',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      showModal({ title: '註冊資料不足', message: '請填寫使用者名稱、Email、電話與密碼。', type: 'danger' });
+      return;
+    }
+    if (!/^[\p{L}][\p{L}\s.'-]{1,39}$/u.test(username.trim())) {
+      showModal({ title: '使用者名稱格式錯誤', message: '姓名或使用者名稱需以文字為主，不能只用數字或符號帶過。', type: 'danger' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      showModal({ title: 'Email 格式錯誤', message: '請輸入有效的 Email。', type: 'danger' });
+      return;
+    }
+    const passwordCheck = evaluatePassword(password);
+    if (!passwordCheck.ok) {
+      showModal({ title: `密碼${passwordCheck.label}`, message: passwordCheck.message, type: 'danger' });
       return;
     }
     if (password !== confirmPassword) {
-      setModalConfig({
-        isOpen: true,
-        title: 'PASSWORD MISMATCH',
-        message: '密碼與確認密碼不相符',
-        confirmText: '確認',
-        cancelText: '',
-        type: 'danger',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      showModal({ title: '密碼不一致', message: '請確認兩次輸入的密碼完全相同。', type: 'danger' });
       return;
     }
     try {
@@ -118,13 +158,9 @@ export default function LoginPage() {
 
       const data = await response.json();
       if (response.ok) {
-        setModalConfig({
-          isOpen: true,
-          title: 'REGISTRATION SUCCESS',
-          message: '註冊成功，請使用新帳號登入',
-          confirmText: '確認',
-          cancelText: '',
-          type: 'info',
+        showModal({
+          title: '註冊成功',
+          message: '帳號已建立，請重新登入。',
           onConfirm: () => {
             setModalConfig(prev => ({ ...prev, isOpen: false }));
             setFormData(prev => ({ ...prev, password:'', confirmPassword: '' }));
@@ -132,45 +168,24 @@ export default function LoginPage() {
           }
         });
       } else {
-        setModalConfig({
-          isOpen: true,
-          title: 'REGISTER FAILED',
-          message: data.error || '註冊失敗',
-          confirmText: '確認',
-          cancelText: '',
-          type: 'danger',
-          onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-        });
+        showModal({ title: '註冊失敗', message: data.error || '註冊暫時無法完成。', type: 'danger' });
       }
     } catch (error) {
-      console.error("Registration Error:", error);
-      setModalConfig({
-        isOpen: true,
-        title: 'REGISTRATION ERROR',
-        message: '建立帳號時發生錯誤，請稍後再試',
-        confirmText: '確認',
-        cancelText: '',
-        type: 'danger',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      console.error('Registration Error:', error);
+      showModal({ title: '註冊失敗', message: '伺服器暫時無法回應，請稍後再試。', type: 'danger' });
     }
   };
 
   const handleReset = () => {
-    setModalConfig({
-      isOpen: true,
-      title: 'RESET LINK SENT',
-      message: `已發送重置連結到註冊 ${resetMethod.toUpperCase()}`,
-      confirmText: '確認',
-      cancelText: '',
-      type: 'info',
+    showModal({
+      title: '重設通知已送出',
+      message: `系統已送出重設資訊到你的 ${resetMethod === 'email' ? 'Email' : '電話'}。`,
       onConfirm: () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }));
         setMode('login');
       }
     });
   };
-
   const cardVariants = {
     hidden: { opacity: 0, scale: 0.92, y: 15 },
     visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
@@ -192,9 +207,16 @@ export default function LoginPage() {
           -webkit-box-shadow: 0 0 0px 1000px rgba(0,0,0,0) inset;
           transition: background-color 5000s ease-in-out 0s;
         }
+        input[type="checkbox"] {
+          cursor: pointer;
+          width: 18px;
+          height: 18px;
+          accent-color: #d4af37;
+          flex-shrink: 0;
+        }
       `}</style>
 
-      {/* 返回 EnterPage */}
+      {/* 餈? EnterPage */}
       <div style={topBarStyle}>
         <BackBtn onClick={() => navigate('/')} />
         <div style={navBrandStyle} onClick={() => navigate('/')}>MYSTIC ARCHIVE</div></div>
@@ -238,6 +260,11 @@ export default function LoginPage() {
                 </span>
               </div>
 
+              <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <input type="checkbox" name="rememberMe" checked={formData.rememberMe} onChange={handleChange} id="rememberMe" />
+                <label htmlFor="rememberMe" style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.7)', cursor: 'pointer', margin: 0 }}>記住我，24 小時內免重新登入</label>
+              </div>
+
               <motion.button
                 whileHover={{ scale: 1.02, backgroundColor: COLORS.gold, color: '#fff', boxShadow: `0 0 30px ${COLORS.gold}80` }}
                 whileTap={{ scale: 0.98 }}
@@ -261,14 +288,18 @@ export default function LoginPage() {
             <h1 style={{...mainTitleStyle, fontSize: '2rem', marginBottom: '20px'}}>REGISTER</h1>
 
             <div style={{...formGroupStyle, gap: '10px'}}>
-              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="USERNAME" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="EMAIL" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="PHONE" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="PASSWORD" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="姓名或使用者名稱" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="電子郵件" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="電話號碼" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 12 碼，含大小寫、數字、符號" style={inputStyle}/></div>
               <div style={inputWrapperStyle}>
                 <CheckCircle size={12} style={{...iconStyle, color: formData.password && formData.password === formData.confirmPassword ? '#00ffaa' : COLORS.textGray }}/>
-                <input name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} placeholder="CONFIRM" style={inputStyle}/>
+                <input name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} placeholder="再次輸入密碼" style={inputStyle}/>
               </div>
+              <button type="button" onClick={fillGeneratedPassword} style={secondaryBtnStyle}>產生安全密碼</button>
+              <button type="button" onClick={handleGoogleRegister} style={googleBtnStyle}>
+                <Mail size={14} /> 使用 Google / Gmail 註冊
+              </button>
 
               <motion.button
                 whileHover={{ scale: 1.02, backgroundColor: COLORS.gold, color: '#000' }}
@@ -395,6 +426,28 @@ const primaryBtnStyle = {
   gap: '12px', borderRadius: '14px', transition: 'all 0.3s ease'
 };
 
+const secondaryBtnStyle = {
+  height: '38px',
+  borderRadius: '10px',
+  border: '1px solid rgba(212,175,55,0.34)',
+  background: 'rgba(212,175,55,0.08)',
+  color: '#f1d891',
+  fontFamily: 'Cinzel',
+  fontSize: '0.68rem',
+  letterSpacing: '2px',
+  cursor: 'pointer'
+};
+
+const googleBtnStyle = {
+  ...secondaryBtnStyle,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  background: 'rgba(255,255,255,0.045)',
+  color: 'rgba(255,255,255,0.84)'
+};
+
 const methodToggleContainer = { display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '20px' };
 
 const methodTab = { fontSize: '0.65rem', fontFamily: 'Cinzel', letterSpacing: '2px', cursor: 'pointer', padding: '5px 10px', transition: '0.3s' };
@@ -405,3 +458,4 @@ const footerLinkArea = {
 };
 
 const linkStyle = { cursor: 'pointer', transition: 'color 0.3s' };
+
