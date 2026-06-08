@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, Copy, ExternalLink, Heart, Sparkles } from 'lucide-react';
+import { Heart, Sparkles } from 'lucide-react';
 import TarotDrawStage from './TarotDrawStage';
 import MysticModal from '../MysticModal';
+import TarotResult from '../results/TarotResult';
 
 const text = (value) => decodeURIComponent(value);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -89,6 +90,16 @@ const SAMPLE_RESULTS = [
     'Princess of Disks', 'The Star', 'Art', 'Fortune'
 ];
 
+// Fisher-Yates 瘣?蝞?
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 function createShuffleLayout(count = DECK_SIZE) {
     return Array.from({ length: count }, (_, index) => {
     const side = index % 2 === 0 ? -1 : 1;
@@ -113,7 +124,16 @@ function getAssetUrl(path = '') {
   return `${API_BASE_URL}${path}`;
 }
 
-const getToken = () => localStorage.getItem('mystic_token') || localStorage.getItem('token') || '';
+const getToken = () => {
+  const expiresAt = Number(localStorage.getItem('mystic_token_expires_at') || 0);
+  if (expiresAt > 0 && Date.now() >= expiresAt) {
+    localStorage.removeItem('mystic_token');
+    localStorage.removeItem('mystic_token_expires_at');
+    localStorage.removeItem('user_info');
+    return '';
+  }
+  return localStorage.getItem('mystic_token') || localStorage.getItem('token') || '';
+};
 
 function runSmoothViewTransition(update) {
   if (typeof document !== 'undefined' && document.startViewTransition) {
@@ -277,6 +297,9 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
   const [isRiteTransitioning, setIsRiteTransitioning] = useState(false);
   const [ritualPhase, setRitualPhase] = useState('idle');
   const [shuffleMode, setShuffleMode] = useState('riffle');
+  const [shuffledDeck, setShuffledDeck] = useState([]);
+  const [arcDeckMap, setArcDeckMap] = useState([]);
+  const [drawnCardIndices, setDrawnCardIndices] = useState([]);
   const transitionTimelineRef = useRef(null);
   const spreadPanelRef = useRef(null);
   const spreadStageRef = useRef(null);
@@ -451,6 +474,12 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
     killRiteTransition();
 
     runSmoothViewTransition(() => {
+      if (drawableCards.length > 0) {
+        const nextDeck = shuffleArray(drawableCards);
+        setShuffledDeck(nextDeck);
+        setArcDeckMap(shuffleArray(Array.from({ length: nextDeck.length }, (_, index) => index)));
+      }
+      setDrawnCardIndices([]);
       setStep('draw_cards');
       setRitualPhase('spread');
       setIsRiteTransitioning(false);
@@ -485,6 +514,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       setIsCompleting(false);
       setShuffleTick(0);
       setShuffleMode('riffle');
+      setArcDeckMap([]);
       setStep('question');
       setRitualPhase('idle');
       setIsRiteTransitioning(false);
@@ -496,9 +526,21 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
     if (selectedDraws.length >= spread.count) return;
     if (selectedDraws.some((card) => card.sourceIndex === sourceIndex)) return;
 
+    const pool = shuffledDeck.length > 0 ? shuffledDeck : drawableCards;
+    if (pool.length === 0) return;
+
+    const mappedIndex = arcDeckMap.length > 0
+      ? arcDeckMap[sourceIndex % arcDeckMap.length]
+      : sourceIndex % pool.length;
+    let deckIndex = mappedIndex;
+    if (drawnCardIndices.includes(deckIndex)) {
+      deckIndex = pool.findIndex((_, idx) => !drawnCardIndices.includes(idx));
+    }
+
+    if (deckIndex < 0) return;
+    const tarotCard = pool[deckIndex];
     const position = selectedDraws.length + 1;
-    const pool = drawableCards.length ? drawableCards : [];
-    const tarotCard = pool.length ? pool[(sourceIndex + position * 3) % pool.length] : null;
+
     const card = {
       id: `${Date.now()}-${sourceIndex}`,
       sourceIndex,
@@ -510,6 +552,10 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       meaning: tarotCard?.meaning || '',
       position
     };
+
+    const nextDrawnIndices = [...drawnCardIndices, deckIndex];
+    setDrawnCardIndices(nextDrawnIndices);
+
     const nextDraws = [...selectedDraws, card];
     setSelectedDraws(nextDraws);
 
@@ -518,7 +564,6 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       setRitualPhase('waitingReveal');
     }
   };
-
   const drawSoulMasterFromArc = (sourceIndex) => {
     if (isCompleting) return;
     if (selectedDraws.length >= SOUL_MASTER_SPREAD.count) return;
@@ -568,11 +613,11 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       })),
       summary: [
         `牌陣：${spread.name}`,
-        `主牌：${soulMaster}`,
+        `靈魂主牌：${soulMaster}`,
         `問題：${trimmedQuestion}`,
         '',
-        '抽到的牌：',
-        ...cards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `｜${card.meaning}` : ''}`)
+        '抽出的牌：',
+        ...cards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `：${card.meaning}` : ''}`)
       ].join('\n')
     });
 
@@ -597,7 +642,6 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       console.error('Failed to save tarot history:', error);
     }
   }, [onHistoryCreated, question, soulMaster, spread.count, spread.key, spread.name, spread.zhName]);
-
   const completeSoulMasterDraw = useCallback(() => {
     const masterCard = selectedDraws[0];
     if (!masterCard?.name) return;
@@ -658,22 +702,49 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
     });
   }, [persistTarotHistory, question, selectedDraws, soulMaster]);
 
-  const tarotPrompt = useMemo(() => {
-    if (!drawnCards.length || !soulMaster) return '';
+  const basicTarotReport = useMemo(() => {
+    if (!drawnCards.length) return '';
+
+    const cardLines = drawnCards.map((card) => {
+      const meaning = card.meaning ? `：${card.meaning}` : '';
+      return `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${meaning}`;
+    });
+
+    const firstCard = drawnCards[0]?.name || '第一張牌';
+    const lastCard = drawnCards[drawnCards.length - 1]?.name || '最後一張牌';
+
     return [
-      '你是一位熟悉托特塔羅、卡巴拉生命之樹、占星對應與心理占卜倫理的專業解牌師。請用繁體中文回覆，語氣清晰、溫柔、具體，不做恐嚇式斷言。',
-      `牌陣：${spread.name}`,
-      `靈魂主牌：${soulMaster}`,
-      `核心要求：請以靈魂主牌「${soulMaster}」作為本次問題分析與解牌的核心底色，說明它如何影響整體牌陣、當事人的盲點與可行行動。`,
-      `提問：${question.trim()}`,
+      `本次牌陣以「${spread.name}」回應你的問題：${question.trim() || '未填寫問題'}。`,
+      `靈魂主牌「${soulMaster || '未設定'}」像是這次解讀的底色，提醒你先看見自己反覆出現的慣性，再判斷牌面給出的方向。`,
+      `整體來看，${firstCard} 開啟了事件的主題，${lastCard} 則提示接下來可以採取的態度或行動。這份基本說明先整理牌面輪廓；若你想要更貼近情境、關係與具體決策，可以按下「AI 解讀」取得深入分析。`,
       '',
-      '抽到的牌：',
-      ...drawnCards.map((card) => `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `｜${card.meaning}` : ''}`),
-      '',
-      '請分成：1. 牌陣總覽與靈魂主牌底色；2. 每張牌的位置解讀；3. 牌與牌之間的關係與流動；4. 當下最重要的提醒；5. 三個具體行動建議。'
+      '牌面摘要：',
+      ...cardLines
     ].join('\n');
   }, [drawnCards, question, soulMaster, spread.name]);
 
+  const tarotPrompt = useMemo(() => {
+    if (!drawnCards.length || !soulMaster) return '';
+
+    const cardLines = drawnCards.map((card) => (
+      `${card.position}. ${card.name}${card.subtitle ? ` - ${card.subtitle}` : ''}${card.meaning ? `：${card.meaning}` : ''}`
+    ));
+
+    return [
+      '你是一位熟悉托特塔羅與心理式占卜的解讀師。請根據下方資料，提供深入但不恐嚇、不絕對化的繁體中文解讀。',
+      '請把塔羅視為自我理解與決策參考，不要宣稱命運必然發生。請具體回扣問題、牌陣位置、靈魂主牌與每張牌的象徵。',
+      '',
+      `牌陣：${spread.name}`,
+      `靈魂主牌：${soulMaster}`,
+      `提問：${question.trim() || '未填寫問題'}`,
+      '',
+      '抽牌結果：',
+      ...cardLines,
+      '',
+      '請依序輸出：1. 核心總論 2. 每張牌的位置解讀 3. 牌與牌之間的連動 4. 目前盲點 5. 三個可執行建議 6. 一句總結。',
+      '請避免空泛文字，每段都要能讓使用者看懂自己下一步可以怎麼做。'
+    ].join('\n');
+  }, [drawnCards, question, soulMaster, spread.name]);
   const copyTarotPrompt = async (url) => {
     if (!tarotPrompt) return;
     await navigator.clipboard.writeText(tarotPrompt);
@@ -741,7 +812,6 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
       setIsTarotAiLoading(false);
     }
   };
-
   const handlePrevSpread = () => {
     setActiveSpreadIndex((index) => (index - 1 + SPREADS.length) % SPREADS.length);
   };
@@ -928,7 +998,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
                     .replace('the high priestess', 'the priestess')
                     .trim()
                 )}.png`) : cardBackUrl}
-                alt={soulMaster || 'Master Card'}
+                alt={soulMaster || '靈魂主牌'}
                 style={questionMasterImage}
                 onError={(event) => {
                   event.currentTarget.src = cardBackUrl;
@@ -1010,9 +1080,9 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
                     animate={{
                       x: (randomX - 0.5) * (viewportWidth + 220) + driftX,
                       y: (randomY - 0.5) * (viewportHeight + 180) + driftY,
-                      rotate: randomRotate * 6,       // 22 → 6，幾乎不側轉
-                      rotateY: randomRotateY * 28,    // 68 → 28，牌大致面向觀眾
-                      rotateX: randomRotateX * 8,     // 22 → 8，只有輕微前後傾斜
+                      rotate: randomRotate * 6,
+                      rotateY: randomRotateY * 28,
+                      rotateX: randomRotateX * 8,
                       scale: 0.52 + randomScale * 0.44,
                       opacity: 0.58 + randomDepth * 0.38,
                       zIndex: Math.round(randomDepth * 50)
@@ -1036,7 +1106,7 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
               })}
             </div>
             <div style={shuffleControl}>
-              <p style={shuffleHint}>牌面正在隨機洗牌，感覺完成後停止。</p>
+              <p style={shuffleHint}>{COPY.shuffleHint}</p>
               <motion.button whileHover={buttonHover} whileTap={buttonTap} onClick={stopShuffle} disabled={isRiteTransitioning} style={primaryButton}>
                 <Sparkles size={17} />
                 {COPY.stopShuffle}
@@ -1073,72 +1143,31 @@ export default function TarotDrawingSystem({ cardBackUrl, onBackHandlerChange, o
         )}
 
         {step === 'result' && (
-          <motion.div key="result" {...fadeMotion} style={resultStage}>
-            <motion.button
-              type="button"
-              aria-label="Favorite tarot result"
-              title={savedHistory?.id ? '收藏這次占卜' : '歷史紀錄保存後可收藏'}
-              style={resultFavoriteButton(savedHistory?.isFavorite)}
-              whileHover={resultFavoriteHover(savedHistory?.isFavorite)}
-              whileTap={buttonTap}
-              disabled={!savedHistory?.id}
-              onClick={toggleResultFavorite}
-            >
-              <Heart size={20} fill={savedHistory?.isFavorite ? '#bc13fe' : 'transparent'} />
-            </motion.button>
-            <div style={resultMasterCard}>
-              <img
-                src={soulMaster ? getAssetUrl(`/tarot/cards/main/${encodeURIComponent(
-                  soulMaster
-                    .toLowerCase()
-                    .replace('the magician', 'the magus')
-                    .replace('the high priestess', 'the priestess')
-                    .trim()
-                )}.png`) : cardBackUrl}
-                alt={soulMaster || 'Master Card'}
-                style={resultMasterImage}
-                onError={(e) => { e.currentTarget.src = cardBackUrl; }}
-              />
-              <span style={resultMasterLabel}>MASTER CARD</span>
-              <strong style={resultMasterName}>{soulMaster || '未抽取主牌'}</strong>
-            </div>
-            <div style={resultHeader}>
-              <div style={goldLabel}>READING RESULT</div>
-              <h2 style={title}>{spread.name}</h2>
-              <p style={resultSubcopy}>{COPY.selectedPrefix} {drawnCards.length} {COPY.cardUnit}</p>
-            </div>
-            <ResultSpread cards={drawnCards} spread={spread} cardBackUrl={cardBackUrl} />
-            <div style={tarotResultActions}>
-              <div style={tarotPromptWrap}>
-                <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={() => setShowTarotPromptMenu((open) => !open)}>
-                  <Copy size={16} />
-                  <span>複製 Prompt</span>
-                </motion.button>
-                {showTarotPromptMenu && (
-                  <div className="tarot-prompt-menu" style={tarotPromptMenu}>
-                    {TAROT_AI_TARGETS.map((target) => (
-                      <button key={target.label} type="button" style={tarotPromptMenuItem} onClick={() => copyTarotPrompt(target.url)}>
-                        <span>{target.label}</span>
-                        <ExternalLink size={13} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <motion.button type="button" style={tarotActionButton} whileHover={tarotActionHover} whileTap={buttonTap} onClick={generateTarotAiReport} disabled={isTarotAiLoading}>
-                <Bot size={16} />
-                <span>{isTarotAiLoading ? 'AI 解讀中' : 'AI 解讀'}</span>
-              </motion.button>
-            </div>
-            {tarotAiReport && <pre style={tarotAiReportBox}>{tarotAiReport}</pre>}
-          </motion.div>
+          <TarotResult
+            cardBackUrl={cardBackUrl}
+            soulMaster={soulMaster}
+            spread={spread}
+            drawnCards={drawnCards}
+            basicReport={basicTarotReport}
+            aiReport={tarotAiReport}
+            isAiLoading={isTarotAiLoading}
+            savedHistory={savedHistory}
+            aiTargets={TAROT_AI_TARGETS}
+            showPromptMenu={showTarotPromptMenu}
+            setShowPromptMenu={setShowTarotPromptMenu}
+            copyPrompt={copyTarotPrompt}
+            runAiReading={generateTarotAiReport}
+            toggleFavorite={toggleResultFavorite}
+            getAssetUrl={getAssetUrl}
+            buttonTap={buttonTap}
+          />
         )}
       </AnimatePresence>
       <MysticModal
         isOpen={showQuestionRequiredModal}
         onClose={() => setShowQuestionRequiredModal(false)}
         onConfirm={() => setShowQuestionRequiredModal(false)}
-        title="QUESTION REQUIRED"
+        title="請先輸入問題"
         message={text('%E8%AB%8B%E5%85%88%E8%BC%B8%E5%85%A5%E4%BD%A0%E6%83%B3%E8%A9%A2%E5%95%8F%E7%9A%84%E5%95%8F%E9%A1%8C%EF%BC%8C%E5%86%8D%E9%96%8B%E5%A7%8B%E5%8D%A0%E5%8D%9C%E5%84%80%E5%BC%8F%E3%80%82')}
         confirmText={text('%E6%88%91%E7%9F%A5%E9%81%93%E4%BA%86')}
         cancelText=""
@@ -1187,7 +1216,7 @@ function QuestionGuideBookModal({ onClose, onStart }) {
       >
         <motion.button
           type="button"
-          aria-label="Close guide"
+          aria-label="關閉儀式指引"
           onClick={onClose}
           style={bookCloseX}
           whileHover={{ scale: 1.08, filter: 'brightness(1.15) drop-shadow(0 0 10px rgba(188,19,254,0.45))' }}
@@ -1197,9 +1226,9 @@ function QuestionGuideBookModal({ onClose, onStart }) {
         </motion.button>
 
         <section style={bookLeftContent}>
-          <div style={bookEyebrow}>QUESTION RITE</div>
+          <div style={bookEyebrow}>提問儀式</div>
           <h3 style={bookTitle}>{text('%E5%84%80%E5%BC%8F%E7%A5%88%E8%AB%8B')}</h3>
-          <div style={bookSubtitle}>INVOCATION</div>
+          <div style={bookSubtitle}>占卜前的整理</div>
           <p style={bookInvocation}>{COPY.guideBody}</p>
           <div style={bookDivider} />
           <p style={bookInstruction}>{COPY.guideInstruction}</p>
@@ -1209,7 +1238,7 @@ function QuestionGuideBookModal({ onClose, onStart }) {
           <p style={bookNote}>{COPY.guideNote}</p>
           <motion.button type="button" onClick={onStart || onClose} style={bookCloseButton} whileHover={bookButtonHover} whileTap={{ scale: 0.97 }}>
             <span>{COPY.openRite}</span>
-            <small>PROCEED TO DIVINATION</small>
+            <small>開始抽牌</small>
           </motion.button>
         </section>
       </motion.div>
@@ -1222,7 +1251,7 @@ function FloatingGuideBook({ onClick, style }) {
   return (
     <motion.button
       type="button"
-      aria-label="Open question guide"
+      aria-label="開啟提問指引"
       style={{ ...floatingGuideBook, ...style }}
       whileHover={{ y: -4, scale: 1.05, filter: 'drop-shadow(0 0 18px rgba(188,19,254,0.55)) brightness(1.12)' }}
       whileTap={{ scale: 0.95 }}
@@ -1254,7 +1283,7 @@ function ResultCard({ card, cardBackUrl, style }) {
       style={{ ...resultCardWrap, ...style }}
     >
       <div style={resultCardFace(faceUrl)} />
-      <div style={resultNumber}>POSITION {card.position}</div>
+      <div style={resultNumber}>第 {card.position} 張</div>
       <div style={resultName}>{card.name}</div>
       {card.subtitle && <div style={resultSubtitle}>{card.subtitle}</div>}
     </motion.div>
@@ -2152,6 +2181,20 @@ const tarotPromptMenuItem = {
   cursor: 'pointer',
   transition: 'background 160ms ease, color 160ms ease, transform 160ms ease'
 };
+const tarotBasicReportBox = {
+  width: 'min(880px, 92vw)',
+  margin: '8px auto 0',
+  padding: '18px 20px',
+  borderRadius: '8px',
+  border: '1px solid rgba(212,175,55,0.2)',
+  background: 'linear-gradient(180deg, rgba(18,8,26,0.72), rgba(5,2,10,0.82))',
+  color: 'rgba(255,255,255,0.82)',
+  fontFamily: zhFont,
+  fontSize: '0.92rem',
+  lineHeight: 1.85,
+  whiteSpace: 'pre-wrap',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 36px rgba(0,0,0,0.28)'
+};
 const tarotAiReportBox = {
   width: 'min(900px, 92vw)',
   margin: '28px auto 0',
@@ -2848,3 +2891,8 @@ const drawSystemCSS = `
   }
 `;
  
+
+
+
+
+

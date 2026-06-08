@@ -78,16 +78,51 @@ function getMasterCardImagePath(name = '') {
   return normalized ? `/tarot/cards/main/${encodeURIComponent(normalized)}.png` : '';
 }
 
-function getSpreadSlots(spread) {
+// 根據牌的名稱/slug 生成圖片 URL（備用邏輯）
+function generateCardImagePath(cardName = '', cardSlug = '', cardSuit = '') {
+  // 如果有 slug，優先使用 slug 生成路徑
+  if (cardSlug) {
+    const suit = cardSuit?.toLowerCase() || 'main';
+    const folder = suit === 'major' ? 'main' : suit === 'wands' ? 'wands' : suit === 'cups' ? 'cups' : suit === 'swords' ? 'swords' : suit === 'disks' ? 'disks' : 'main';
+    return `/tarot/cards/${folder}/${encodeURIComponent(cardSlug)}.png`;
+  }
+  
+  // 備用：根據牌名生成路徑
+  if (cardName) {
+    const normalized = cardName
+      .toLowerCase()
+      .replace(/the /g, 'the ')
+      .replace(/\s+/g, '-')
+      .trim();
+    return `/tarot/cards/main/${encodeURIComponent(normalized)}.png`;
+  }
+  
+  return '';
+}
+
+// 隨機化攤牌位置 - 在固定位置基礎上加入隨機偏移
+function randomizeSpreadLayout(baseLayout) {
+  const randomRange = 20; // 隨機偏移範圍（像素）
+  return baseLayout.map(slot => ({
+    ...slot,
+    x: slot.x + (Math.random() - 0.5) * randomRange,
+    y: slot.y + (Math.random() - 0.5) * randomRange,
+    rotate: (Math.random() - 0.5) * 8 // 隨機旋轉 ±4度
+  }));
+}
+
+function getSpreadSlots(spread, shouldRandomize = false) {
   const key = spread?.key || 'open_reading';
   const layout = SPREAD_LAYOUTS[key] || SPREAD_LAYOUTS.open_reading;
   const labels = POSITION_LABELS[key] || POSITION_LABELS.open_reading;
   const count = spread?.count || layout.length;
 
-  return Array.from({ length: count }, (_, index) => ({
+  const baseSlots = Array.from({ length: count }, (_, index) => ({
     ...(layout[index] || { x: (index - (count - 1) / 2) * 142, y: 24 }),
     label: labels[index] || `Position ${index + 1}`
   }));
+
+  return shouldRandomize ? randomizeSpreadLayout(baseSlots) : baseSlots;
 }
 
 function getArcPosition(index, arcCardCount = ARC_CARD_COUNT) {
@@ -142,7 +177,7 @@ export default function TarotDrawStage({
   const [flippedCards, setFlippedCards] = useState({});
   const [guideIndex, setGuideIndex] = useState(0);
   const [hoveredArcIndex, setHoveredArcIndex] = useState(null);
-  const slots = useMemo(() => getSpreadSlots(spread), [spread]);
+  const slots = useMemo(() => getSpreadSlots(spread, true), [spread]);
   const nextSlot = slots[selectedDraws.length];
   const selectionComplete = selectedDraws.length >= slots.length;
 
@@ -467,7 +502,7 @@ export default function TarotDrawStage({
                     </span>
                     <span style={flipFaceShell(true)}>
                       <img
-                        src={drawnCard.imageUrl ? getAssetUrl(drawnCard.imageUrl) : cardBackUrl}
+                        src={drawnCard.imageUrl ? getAssetUrl(drawnCard.imageUrl) : (getAssetUrl(generateCardImagePath(drawnCard.name, drawnCard.slug, drawnCard.suit)) || cardBackUrl)}
                         alt={drawnCard.name || slot.label}
                         style={flipFaceImage}
                         onError={(event) => {
@@ -943,13 +978,31 @@ const drawStageCSS = `
   }
 
   @media (max-width: 860px) {
+    .tarot-draw-stage {
+      min-height: 640px !important;
+      overflow: hidden auto !important;
+    }
+
+    .tarot-draw-stage::before {
+      width: 980px;
+      top: 42%;
+    }
+
+    .tarot-draw-stage::after {
+      width: 760px;
+      top: 50%;
+    }
+
     .draw-spread-map {
       transform-origin: center center;
+      left: 50% !important;
+      width: 760px !important;
     }
 
     .arc-deck {
       top: 45% !important;
-      transform: scale(0.72);
+      left: 50% !important;
+      transform: scale(0.66);
       transform-origin: center center;
     }
 
@@ -964,6 +1017,22 @@ const drawStageCSS = `
       top: 46% !important;
       transform: scale(0.82);
       transform-origin: left center;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .arc-deck {
+      top: 47% !important;
+      transform: scale(0.54);
+    }
+
+    .draw-spread-map {
+      transform: translate(-50%, -50%) scale(0.72) !important;
+    }
+
+    .draw-master-card {
+      transform: scale(0.72) !important;
+      transform-origin: left top !important;
     }
   }
 `;

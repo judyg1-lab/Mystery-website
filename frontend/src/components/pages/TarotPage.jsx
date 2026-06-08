@@ -178,6 +178,16 @@ const CHINESE_SUBTITLES = {
   'Obstacle': '當前阻力', 'Outcome': '未來走向',
   'Position 1': '過去 / 根基', 'Position 2': '現在 / 能量', 'Position 3': '未來 / 結果',
   'Position 4': '第四張牌', 'Position 5': '第五張牌',
+  'Air / Aleph': '風元素 / Aleph', 'Mercury / Beth': '水星 / Beth', 'Moon / Gimel': '月亮 / Gimel',
+  'Venus / Daleth': '金星 / Daleth', 'Aries / Tzaddi': '牡羊座 / Tzaddi', 'Taurus / Vav': '金牛座 / Vav',
+  'Gemini / Zain': '雙子座 / Zain', 'Cancer / Cheth': '巨蟹座 / Cheth', 'Libra / Lamed': '天秤座 / Lamed',
+  'Virgo / Yod': '處女座 / Yod', 'Jupiter / Kaph': '木星 / Kaph', 'Leo / Teth': '獅子座 / Teth',
+  'Water / Mem': '水元素 / Mem', 'Scorpio / Nun': '天蠍座 / Nun', 'Sagittarius / Samekh': '射手座 / Samekh',
+  'Capricorn / Ayin': '摩羯座 / Ayin', 'Mars / Peh': '火星 / Peh', 'Aquarius / Tzaddi': '水瓶座 / Tzaddi',
+  'Pisces / Qoph': '雙魚座 / Qoph', 'Sun / Resh': '太陽 / Resh', 'Fire and Spirit / Shin': '火與靈 / Shin',
+  'Saturn / Tau': '土星 / Tau', 'Root of Fire': '火元素根源', 'Root of Water': '水元素根源',
+  'Root of Air': '風元素根源', 'Root of Earth': '土元素根源', 'Court of Fire': '火元素宮廷牌',
+  'Court of Water': '水元素宮廷牌', 'Court of Air': '風元素宮廷牌', 'Court of Earth': '土元素宮廷牌',
 };
 
 const CHINESE_CARD_THEMES = {
@@ -193,6 +203,29 @@ const CHINESE_CARD_THEMES = {
   'Adjustment': '業力平衡 / 正義 / 因果',
   'Death': '蛻變 / 終結 / 新生的門扉',
   'The Hermit': '內省 / 孤獨的智慧 / 引導之光',
+  'Art': '調和 / 煉金 / 把矛盾融合成新的可能',
+  'Princess of Disks': '土元素公主 / 潛力 / 新資源的孕育',
+  'Knight of Disks': '土元素騎士 / 穩定 / 長期執行',
+  'Queen of Disks': '土元素皇后 / 照顧 / 生活安全感',
+  'Prince of Disks': '土元素王子 / 規劃 / 實際建設',
+};
+
+const CHINESE_CARD_MEANINGS = {
+  'Art': '這張牌談的是調和與整合。看似衝突的元素需要被重新混合，不急著選邊，而是找到能讓兩股力量共同工作的方式。',
+  'Princess of Disks': '這張牌象徵新資源、新身體感或新計畫的孕育。它不是立刻爆發的成果，而是值得照顧、培養、慢慢成熟的種子。',
+  'Knight of Disks': '這張牌提醒你回到穩定節奏，用耐心、務實與重複累積守住成果。真正可靠的進展通常不吵，但很有重量。',
+  'Queen of Disks': '這張牌關於照顧、滋養與生活品質。先讓身體與現實環境安定下來，直覺和安全感才會更清楚。',
+  'Prince of Disks': '這張牌適合規劃、建設與長期經營。它提醒你把想法變成流程，讓資源有方向地慢慢長出成果。'
+};
+
+const getChineseSubtitle = (value = '') => CHINESE_SUBTITLES[value] || value;
+
+const getChineseCardMeaning = (card = {}, fallback = '') => {
+  const title = card.card?.title || card.name || '';
+  const rawMeaning = card.meaning || '';
+  if (CHINESE_CARD_MEANINGS[title]) return CHINESE_CARD_MEANINGS[title];
+  if (!rawMeaning || isEnglishText(rawMeaning)) return fallback;
+  return rawMeaning;
 };
 
 const CHINESE_MEANINGS = [
@@ -257,18 +290,18 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
 
       {/* Body grid */}
       <div style={thGrid}>
-        {/* Left: THE SPREAD */}
+        {/* Left: spread */}
         <section style={thSpreadPanel}>
           <div style={thSectionTitle}>
             <span style={thOrnLine} />
-            <span>THE SPREAD · 牌陣展開</span>
+            <span>牌陣展開</span>
             <span style={thOrnLine} />
           </div>
 
           <div style={thCardRow}>
             {displayedCards.map((card, index) => {
               const imageUrl = card.imageUrl || card.card?.imageUrl || '';
-              const posLabel = CHINESE_SUBTITLES[card.subtitle] || card.subtitle || `位置 ${card.position || index + 1}`;
+              const posLabel = getChineseSubtitle(card.subtitle) || `位置 ${card.position || index + 1}`;
               return (
                 <motion.button
                   key={`card-${index}`}
@@ -277,7 +310,7 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
                   onClick={() => onCardOpen?.({
                     name: card.name,
                     card: card.card,
-                    meaning: card.meaning || CHINESE_MEANINGS[index % CHINESE_MEANINGS.length],
+                    meaning: getChineseCardMeaning(card, CHINESE_MEANINGS[index % CHINESE_MEANINGS.length]),
                     orbit: posLabel
                   })}
                   whileHover={{ y: -6, filter: 'drop-shadow(0 0 14px rgba(188,19,254,0.5))' }}
@@ -301,10 +334,10 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
             })}
           </div>
 
-          {/* Final Oracle */}
+          {/* Final oracle */}
           <div style={thOracle}>
             <div style={{ color: '#d4af37', letterSpacing: '0.32em', fontSize: '0.7rem', marginBottom: '8px', fontFamily: 'Cinzel' }}>
-              ✦ FINAL ORACLE · 最終指引 ✦
+              ✦ 最終指引 ✦
             </div>
             <p style={{ color: 'rgba(255,255,255,0.78)', fontFamily: "'Noto Serif TC',serif", fontSize: '0.86rem', lineHeight: 1.85, margin: 0, letterSpacing: '0.04em' }}>
               {(question && question !== '未填寫')
@@ -314,11 +347,11 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
           </div>
         </section>
 
-        {/* Right: CARD ANALYSIS */}
+        {/* Right: card analysis */}
         <section style={thAnalysisPanel}>
           <div style={thSectionTitle}>
             <span style={thOrnLine} />
-            <span>牌義解析 ANALYSIS</span>
+            <span>牌義解析</span>
             <span style={thOrnLine} />
           </div>
 
@@ -326,13 +359,10 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
             const imgUrl = (card.imageUrl || card.card?.imageUrl)
               ? getAssetUrl(card.imageUrl || card.card?.imageUrl)
               : TAROT_CARD_BACK_URL;
-            const posLabel = CHINESE_SUBTITLES[card.subtitle] || card.subtitle || '';
+            const posLabel = getChineseSubtitle(card.subtitle) || '';
             const cardTheme = CHINESE_CARD_THEMES[card.name] || posLabel || '牌義 / 解析 / 象徵';
             const rawMeaning = card.meaning || '';
-            // 如果是英文為主則換成中文備用語
-            const meaning = (!rawMeaning || isEnglishText(rawMeaning))
-              ? CHINESE_MEANINGS[index % CHINESE_MEANINGS.length]
-              : rawMeaning;
+            const meaning = getChineseCardMeaning(card, CHINESE_MEANINGS[index % CHINESE_MEANINGS.length]);
 
             return (
               <motion.div
@@ -365,18 +395,26 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
 
       {/* Action bar */}
       <div style={thActionBar}>
-        <button type="button" style={thActionBtn} onClick={onCopyPrompt}>
-          <Copy size={15} /> 複製 Prompt 給 AI
-        </button>
-        <button
+        <motion.button
+          type="button"
+          style={thActionBtn}
+          onClick={onCopyPrompt}
+          whileHover={{ y: -2, scale: 1.03, borderColor: 'rgba(188,19,254,0.6)', boxShadow: '0 0 18px rgba(188,19,254,0.22)' }}
+          whileTap={{ scale: 0.96 }}
+        >
+          <Copy size={15} /> 複製 AI 提示詞
+        </motion.button>
+        <motion.button
           type="button"
           style={{ ...thActionBtn, ...thActionBtnPrimary }}
           onClick={onAiReading}
           disabled={isAiReading}
+          whileHover={{ y: -2, scale: 1.03, borderColor: 'rgba(212,175,55,0.62)', boxShadow: '0 0 24px rgba(188,19,254,0.28)' }}
+          whileTap={{ scale: 0.96 }}
         >
           <Sparkles size={15} />
           {isAiReading ? 'AI 解讀中...' : 'AI 解讀'}
-        </button>
+        </motion.button>
       </div>
     </article>
   );
@@ -386,7 +424,7 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
 const TarotCardDetailOverlay = ({ entry, onClose }) => {
   const title = entry?.card?.title || entry?.name || 'THOTH ARCANA';
   const imageUrl = entry?.card?.imageUrl ? getAssetUrl(entry.card.imageUrl) : TAROT_CARD_BACK_URL;
-  const meaningLines = formatTarotMeaningLines(entry?.meaning);
+  const meaningLines = formatTarotMeaningLines(getChineseCardMeaning(entry, entry?.meaning || ''));
 
   return (
     <AnimatePresence>
@@ -404,7 +442,17 @@ const TarotCardDetailOverlay = ({ entry, onClose }) => {
             style={tarotDetailPanel}
             onClick={(e) => e.stopPropagation()}
           >
-            <button type="button" style={tarotDetailClose} onClick={onClose} aria-label="Close">×</button>
+            <motion.button
+              type="button"
+              style={tarotDetailClose}
+              onClick={onClose}
+              aria-label="關閉"
+              whileHover={{ scale: 1.12, borderColor: 'rgba(188,19,254,0.72)', boxShadow: '0 0 24px rgba(188,19,254,0.42)' }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ duration: 0.18 }}
+            >
+              ×
+            </motion.button>
             <div style={tarotDetailImageStage}>
               <img src={imageUrl} alt={title} style={tarotDetailImage}
                 onError={(e) => { e.currentTarget.src = TAROT_CARD_BACK_URL; }} />
@@ -1040,9 +1088,9 @@ export default function TarotPage() {
                             </div>
                             <div style={entryNumber}>No.{card.no}</div>
                             <h3 style={entryTitle}>{card.card?.title || card.name}</h3>
-                            <div style={entryOrbit}>{card.orbit}</div>
+                            <div style={entryOrbit}>{getChineseSubtitle(card.orbit)}</div>
                             <div style={entryMeaning}>
-                              {formatTarotMeaningLines(card.meaning).map((line, lineIndex) => (
+                              {formatTarotMeaningLines(getChineseCardMeaning(card, CHINESE_MEANINGS[index % CHINESE_MEANINGS.length])).map((line, lineIndex) => (
                                 <span key={lineIndex} style={entryMeaningLine}>{line}</span>
                               ))}
                             </div>
@@ -1212,7 +1260,7 @@ const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', heig
 const topNavBar = {
   boxSizing: 'border-box',
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '80px', padding: '0 38px',
-  position: 'fixed', top: 0, width: '100%', zIndex: 100, borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  position: 'fixed', top: 0, width: '100%', zIndex: 1000, pointerEvents: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(1px)'
 };
 const navBrandStyle = { color: '#d4af37', letterSpacing: '4px', fontSize: '1rem', minWidth: '250px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 };
