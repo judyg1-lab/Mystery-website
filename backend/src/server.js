@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -13,9 +13,9 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors()); // 允許跨網域連線（讓妳 localhost:3000 的 React 能存取 5000 的後端）
-app.use(express.json()); // 解析 JSON 格式的請求體，讓我們可以在 req.body 看到前端傳來的資料
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'))); // 讓 /uploads 路徑對應到 uploads 資料夾，提供靜態檔案服務（讓上傳的大頭貼可以被瀏覽器讀取）
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/tarot', express.static(path.join(__dirname, '../public/tarot')));
 
 const storage = multer.diskStorage({
@@ -26,43 +26,70 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        // 重新命名檔案，加上時間戳記防止使用者上傳相同檔名導致覆蓋
+        // Add a timestamp suffix to avoid filename collisions.
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 const upload = multer({ storage: storage });
 
-// 【中間件】驗證前端傳來的 JWT 通行證
+const COMMON_PASSWORDS = new Set([
+    'password', 'password123', '123456', '12345678', '123456789', 'qwerty', 'qwerty123',
+    'admin123', 'letmein', 'welcome', 'iloveyou', 'abc123', '111111', '000000', 'mystic123'
+]);
+
+function validatePasswordStrength(password = '') {
+    const lower = password.toLowerCase();
+    const checks = [
+        password.length >= 12,
+        /[A-Z]/.test(password),
+        /[a-z]/.test(password),
+        /\d/.test(password),
+        /[^A-Za-z0-9]/.test(password)
+    ];
+    if (COMMON_PASSWORDS.has(lower) || /^\d+$/.test(password) || /^(.)\1+$/.test(password)) {
+        return '密碼太常見或太容易被猜到';
+    }
+    if (/(.)\1{3,}/.test(password)) {
+        return '密碼不可以使用大量重複字元';
+    }
+    if (checks.filter(Boolean).length < 5) {
+        return '密碼至少 12 碼，並包含大小寫英文、數字與符號';
+    }
+    return '';
+}
+
+// Verify JWT tokens from protected frontend requests.
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // 取得 Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) return res.status(401).json({ error: '未提供授權憑證' });
 
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: '憑證過期或無效' });
-    req.user = user; //將解密後的使用者資訊附加到 req 物件上，讓後續的 API 處理函式可以使用 req.user 來識別當前使用者
-    next();
+        if (err) return res.status(403).json({ error: '授權憑證無效或已過期' });
+        req.user = user;
+        next();
     });
 };
-
 app.post('/api/auth/register', async (req, res) => {
     const { username, email, phone, password } = req.body;
     try {
+        const passwordError = validatePasswordStrength(password || '');
+        if (passwordError) return res.status(400).json({ error: passwordError });
         const existingUser = await prisma.user.findFirst({where: { OR: [{ email }, { username }, { phone }] }});
-        if (existingUser) return res.status(400).json({ error: '該用戶名、電子郵件或手機號碼已被佔用' });
+        if (existingUser) return res.status(400).json({ error: '帳號、Email 或電話已被註冊' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = await prisma.user.create({data: { username, email, phone, password: hashedPassword }});
-        res.status(201).json({ message: '星辰檔案館主人，歡迎妳的加入！', userId: newUser.id });
+        res.status(201).json({ message: '註冊成功，請重新登入。', userId: newUser.id });
     } catch (error) {
         res.status(500).json({ error: '註冊失敗' });
     }
     });
 
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, rememberMe } = req.body;
     try {
         const user = await prisma.user.findUnique({ where: { username } });
         // return 404 if user not found, to prevent attackers from knowing which usernames are valid
@@ -72,9 +99,10 @@ app.post('/api/auth/login', async (req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {return res.status(401).json({ error: 'Authentication failed: Incorrect password.' });}
 
-        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-        res.json({ message: '認證成功，歡迎回到神祕檔案館', token, user });
-    } catch (error) {res.status(500).json({ error: '登入失敗' });}
+        const tokenExpiry = rememberMe ? '24h' : '2h';
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: tokenExpiry });
+        res.json({ message: '登入成功', token, user });
+    } catch (error) {res.status(500).json({ error: '登入失敗，請稍後再試' });}
     });
 
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
@@ -84,20 +112,20 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
             select: { id: true, username: true, email: true, phone: true, bio: true, avatarUrl: true, masterCard: true }
     });
     res.json(user);
-    } catch (error) {res.status(500).json({ error: '檔案讀取失敗' });}});
+    } catch (error) {res.status(500).json({ error: '讀取使用者資料失敗' });}});
 
 app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Please choose an image file to upload' });
 
-  // 生成可供瀏覽器直接讀取的靜態 URL 網址
+  // Store a browser-readable URL for the uploaded avatar.
     const avatarUrl = `http://localhost:5000/uploads/${req.file.filename}`;
 
     try {
         await prisma.user.update({
             where: { id: req.user.userId },
             data: { avatarUrl }});
-        res.json({ message: '大頭貼檔案上傳成功', avatarUrl });
-    } catch (error) {res.status(500).json({ error: '大頭貼路徑寫入資料庫失敗' });}});
+        res.json({ message: '頭像上傳成功', avatarUrl });
+    } catch (error) {res.status(500).json({ error: '頭像上傳失敗' });}});
 
 app.put('/api/user/profile/update', authenticateToken, async (req, res) => {
     const { username, bio} = req.body;
@@ -105,13 +133,13 @@ app.put('/api/user/profile/update', authenticateToken, async (req, res) => {
         const updatedUser = await prisma.user.update({
             where: { id: req.user.userId },
             data: { username, bio }});
-        res.json({ message: '個人檔案更新完成', user: updatedUser });
-    } catch (error) {res.status(500).json({ error: '設定更新失敗' });}});
+        res.json({ message: '個人資料已更新', user: updatedUser });
+    } catch (error) {res.status(500).json({ error: '個人資料更新失敗' });}});
 
 app.put('/api/user/master-card', authenticateToken, async (req, res) => {
     const { masterCard } = req.body;
     if (!masterCard || typeof masterCard !== 'string') {
-        return res.status(400).json({ error: '請提供主牌名稱' });
+        return res.status(400).json({ error: '請提供有效的主牌名稱' });
     }
 
     try {
@@ -120,9 +148,9 @@ app.put('/api/user/master-card', authenticateToken, async (req, res) => {
             data: { masterCard },
             select: { id: true, masterCard: true }
         });
-        res.json({ message: '靈魂主牌已同步', masterCard: user.masterCard });
+        res.json({ message: '靈魂主牌已儲存', masterCard: user.masterCard });
     } catch (error) {
-        res.status(500).json({ error: '主牌同步失敗' });
+        res.status(500).json({ error: '靈魂主牌儲存失敗' });
     }
 });
 
@@ -132,9 +160,9 @@ app.delete('/api/user/master-card', authenticateToken, async (req, res) => {
             where: { id: req.user.userId },
             data: { masterCard: null }
         });
-        res.json({ message: '靈魂主牌已清除' });
+        res.json({ message: '靈魂主牌已重置' });
     } catch (error) {
-        res.status(500).json({ error: '主牌清除失敗' });
+        res.status(500).json({ error: '靈魂主牌重置失敗' });
     }
 });
 
@@ -144,7 +172,7 @@ app.put('/api/user/change-password', authenticateToken, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
         if (!(await bcrypt.compare(currentPassword, user.password))) {
-            return res.status(400).json({ error: '原始密碼輸入錯誤' });
+            return res.status(400).json({ error: '目前密碼輸入錯誤' });
         }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
@@ -152,16 +180,16 @@ app.put('/api/user/change-password', authenticateToken, async (req, res) => {
         where: { id: user.id },
         data: { password: hashedNewPassword }
     });
-    res.json({ message: '加密機制更新成功' });
+    res.json({ message: '密碼已成功更新' });
     } catch (error) {
-    res.status(500).json({ error: '密碼變更失敗' });}});
+    res.status(500).json({ error: '密碼更新失敗' });}});
 
 app.delete('/api/user/delete', authenticateToken, async (req, res) => { //HTTP method
     try {
         await prisma.user.delete({ where: { id: req.user.userId } });
-        res.json({ message: '遺忘協議已啟動，帳號抹除完畢' });
+        res.json({ message: '帳號已刪除，相關資料已清除' });
     } catch (error) {
-    res.status(500).json({ error: '銷毀程序執行失敗' });}});
+    res.status(500).json({ error: '刪除帳號失敗' });}});
 
 app.get('/api/user/favorites', authenticateToken, async (req, res) => {
     try {
@@ -200,7 +228,7 @@ app.post('/api/user/favorites', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: '請提供 articleId、historyId 或 history 資料' });
     }
     if ((articleId ? 1 : 0) + (historyId ? 1 : 0) + (history ? 1 : 0) > 1) {
-        return res.status(400).json({ error: '一次只能收藏一種資料' });
+        return res.status(400).json({ error: '一次只能收藏一種資料類型' });
     }
 
     try {
@@ -237,9 +265,9 @@ app.post('/api/user/favorites', authenticateToken, async (req, res) => {
             createdAt: newFavorite.createdAt
         };
 
-        res.status(201).json({ message: '已寫入收藏', favorite: normalized });
+        res.status(201).json({ message: '收藏成功', favorite: normalized });
     } catch (error) {
-        console.error('收藏失敗', error);
+        console.error('favorite failed', error);
         res.status(500).json({ error: '收藏失敗' });
     }
 });
@@ -247,17 +275,17 @@ app.post('/api/user/favorites', authenticateToken, async (req, res) => {
 app.delete('/api/user/favorites/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
-        const favorite = await prisma.favorite.findUnique({ where: { id: parseInt(id) } }); //parseInt 因為 URL 參數預設是字串，但資料庫中的 ID 是整數，所以要轉換一下
+        const favorite = await prisma.favorite.findUnique({ where: { id: parseInt(id) } });
         // security check: only allow deletion if the favorite belongs to the current user
         if (!favorite || favorite.userId !== req.user.userId) {
-            return res.status(403).json({ error: '無權刪除此收藏' });
+            return res.status(403).json({ error: '沒有權限刪除此收藏' });
         }
         await prisma.favorite.delete({ where: { id: parseInt(id) } });
-        res.json({ message: '已自收藏清單中抹除' });
-    } catch (error) {res.status(500).json({ error: '取消收藏失敗' });}});
+        res.json({ message: '收藏已移除' });
+    } catch (error) {res.status(500).json({ error: '移除收藏失敗' });}});
 
 app.get('/api/tarot/articles', async (req, res) => {
-    const { tabType } = req.query; // 接收前端傳過來的 ?tabType=origins 或 ?tabType=reports
+    const { tabType } = req.query;
 
     try {
         const articles = await prisma.article.findMany({
@@ -266,11 +294,11 @@ app.get('/api/tarot/articles', async (req, res) => {
             orderBy: {id: 'asc'}
         });
 
-    res.json(articles); // 透過 JSON 格式回傳給 React 前端
-    } catch (error) {
-    console.error(" 撈取資料庫秘典失敗:", error);
-    res.status(500).json({ error: '無法調閱星辰機房文獻' });
-    }
+    res.json(articles);
+} catch (error) {
+    console.error('Failed to load tarot articles:', error);
+    res.status(500).json({ error: '無法載入塔羅文章' });
+}
 });
 
 app.get('/api/tarot/cards', async (req, res) => {
@@ -285,10 +313,10 @@ app.get('/api/tarot/cards', async (req, res) => {
             (suitOrder[a.suit] ?? 99) - (suitOrder[b.suit] ?? 99) ||
             a.orderIndex - b.orderIndex
         );
-        res.json(cards);
+        res.json(cards.map(localizeTarotCard));
     } catch (error) {
         console.error('Failed to load tarot cards:', error);
-        res.status(500).json({ error: 'Failed to load tarot cards' });
+        res.status(500).json({ error: '塔羅牌清單載入失敗' });
     }
 });
 
@@ -298,11 +326,11 @@ app.get('/api/tarot/cards/:slug', async (req, res) => {
             where: { slug: req.params.slug }
         });
 
-        if (!card) return res.status(404).json({ error: 'Tarot card not found' });
-        res.json(card);
+        if (!card) return res.status(404).json({ error: '找不到這張塔羅牌' });
+        res.json(localizeTarotCard(card));
     } catch (error) {
         console.error('Failed to load tarot card:', error);
-        res.status(500).json({ error: 'Failed to load tarot card' });
+        res.status(500).json({ error: '塔羅牌載入失敗' });
     }
 });
 
@@ -315,8 +343,8 @@ app.get('/api/astrology/articles', async (req, res) => {
         });
         res.json(articles);
     } catch (error) {
-        console.error(" 撈取星盤文獻失敗:", error);
-        res.status(500).json({ error: '無法調閱星盤文獻' });
+        console.error('Failed to load astrology articles:', error);
+        res.status(500).json({ error: '無法載入星盤文章' });
     }
 });
 
@@ -329,8 +357,8 @@ app.get('/api/ziwei/articles', async (req, res) => {
         });
         res.json(articles);
     } catch (error) {
-        console.error(" 撈取紫微文獻失敗:", error);
-        res.status(500).json({ error: '無法調閱紫微文獻' });
+        console.error('Failed to load ziwei articles:', error);
+        res.status(500).json({ error: '無法載入紫微文章' });
     }
 });
 
@@ -343,8 +371,8 @@ app.get('/api/bazi/articles', async (req, res) => {
         });
         res.json(articles);
     } catch (error) {
-        console.error(" 撈取八字文獻失敗:", error);
-        res.status(500).json({ error: '無法調閱八字文獻' });
+        console.error('Failed to load bazi articles:', error);
+        res.status(500).json({ error: '無法載入八字文章' });
     }
 });
 
@@ -367,7 +395,7 @@ app.get('/api/history/tarot', authenticateToken, async (req, res) => {
             }));
             res.json(normalized);
         } catch (error) {
-            res.status(500).json({ error: '歷史紀錄調閱失敗' });
+            res.status(500).json({ error: '讀取歷史紀錄失敗' });
         }
 });
 
@@ -391,7 +419,7 @@ app.get('/api/history/astrology', authenticateToken, async (req, res) => {
         }));
         res.json(normalized);
     } catch (error) {
-        res.status(500).json({ error: '歷史紀錄調閱失敗' });
+        res.status(500).json({ error: '讀取歷史紀錄失敗' });
     }
 });
 app.get('/api/history/bazi', authenticateToken, async (req, res) => {
@@ -414,7 +442,7 @@ app.get('/api/history/bazi', authenticateToken, async (req, res) => {
         }));
         res.json(normalized);
     } catch (error) {
-        res.status(500).json({ error: '讀取八字歷史紀錄失敗' });
+        res.status(500).json({ error: '讀取歷史紀錄失敗' });
     }
 });
 app.get('/api/history/ziwei', authenticateToken, async (req, res) => {
@@ -437,7 +465,7 @@ app.get('/api/history/ziwei', authenticateToken, async (req, res) => {
         }));
         res.json(normalized);
     } catch (error) {
-        res.status(500).json({ error: '讀取紫微歷史紀錄失敗' });
+        res.status(500).json({ error: '讀取歷史紀錄失敗' });
     }
 });
 const HISTORY_SYSTEMS = {
@@ -447,13 +475,82 @@ const HISTORY_SYSTEMS = {
     ziwei: 'ZIWEI'
 };
 
+const TAROT_SUBTITLE_ZH = {
+    'Air / Aleph': '風元素 / Aleph',
+    'Mercury / Beth': '水星 / Beth',
+    'Moon / Gimel': '月亮 / Gimel',
+    'Venus / Daleth': '金星 / Daleth',
+    'Aries / Tzaddi': '牡羊座 / Tzaddi',
+    'Taurus / Vav': '金牛座 / Vav',
+    'Gemini / Zain': '雙子座 / Zain',
+    'Cancer / Cheth': '巨蟹座 / Cheth',
+    'Libra / Lamed': '天秤座 / Lamed',
+    'Virgo / Yod': '處女座 / Yod',
+    'Jupiter / Kaph': '木星 / Kaph',
+    'Leo / Teth': '獅子座 / Teth',
+    'Water / Mem': '水元素 / Mem',
+    'Scorpio / Nun': '天蠍座 / Nun',
+    'Sagittarius / Samekh': '射手座 / Samekh',
+    'Capricorn / Ayin': '摩羯座 / Ayin',
+    'Mars / Peh': '火星 / Peh',
+    'Aquarius / Tzaddi': '水瓶座 / Tzaddi',
+    'Pisces / Qoph': '雙魚座 / Qoph',
+    'Sun / Resh': '太陽 / Resh',
+    'Fire and Spirit / Shin': '火與靈 / Shin',
+    'Saturn / Tau': '土星 / Tau',
+    'Root of Fire': '火元素根源',
+    'Root of Water': '水元素根源',
+    'Root of Air': '風元素根源',
+    'Root of Earth': '土元素根源',
+    'Court of Fire': '火元素宮廷牌',
+    'Court of Water': '水元素宮廷牌',
+    'Court of Air': '風元素宮廷牌',
+    'Court of Earth': '土元素宮廷牌'
+};
+
+const TAROT_MEANING_ZH = {
+    Art: '調和、融合、煉金整合，以及把衝突素材轉成藝術的能力。',
+    'Princess of Disks': '潛力、孕育與新資源，像種子一樣等待合適季節發芽。',
+    'Knight of Disks': '穩定、耐力與可靠執行，提醒你一步一步守住成果。',
+    'Queen of Disks': '照顧身體、土地與生活品質，讓安全感成為可居住的現實。',
+    'Prince of Disks': '規劃、生產與長期建設，把資源慢慢養成成果。'
+};
+
+function localizeTarotCard(card) {
+    return {
+        ...card,
+        subtitle: TAROT_SUBTITLE_ZH[card.subtitle] || card.subtitle,
+        meaning: TAROT_MEANING_ZH[card.title] || card.meaning
+    };
+}
+
 const AI_SYSTEM_LABELS = {
-    tarot: '托特塔羅',
+    tarot: '塔羅牌',
     astrology: '西洋星盤',
-    bazi: '八字四柱',
+    bazi: '八字命盤',
     ziwei: '紫微斗數'
 };
 
+const AI_PROMPT_MAX_CHARS = Number(process.env.AI_PROMPT_MAX_CHARS || 4200);
+const AI_RATE_LIMIT_WINDOW_MS = Number(process.env.AI_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000);
+const AI_RATE_LIMIT_MAX = Number(process.env.AI_RATE_LIMIT_MAX || 12);
+const AI_MAX_OUTPUT_TOKENS = Number(process.env.AI_MAX_OUTPUT_TOKENS || 1200);
+const aiUsageBuckets = new Map();
+
+function checkAiUsageLimit(userId, system) {
+    const now = Date.now();
+    const key = `${userId}:${system}`;
+    const bucket = aiUsageBuckets.get(key) || [];
+    const recentCalls = bucket.filter((timestamp) => now - timestamp < AI_RATE_LIMIT_WINDOW_MS);
+
+    if (recentCalls.length >= AI_RATE_LIMIT_MAX) {
+        return false;
+    }
+
+    recentCalls.push(now);
+    aiUsageBuckets.set(key, recentCalls);
+    return true;
+}
 async function generateGeminiReading(prompt) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -474,7 +571,7 @@ async function generateGeminiReading(prompt) {
         generationConfig: {
             temperature: 0.72,
             topP: 0.92,
-            maxOutputTokens: 2200
+            maxOutputTokens: AI_MAX_OUTPUT_TOKENS
         }
     }, { timeout: 30000 });
 
@@ -497,11 +594,19 @@ app.post('/api/ai/reading', authenticateToken, async (req, res) => {
     const prompt = String(req.body?.prompt || '').trim();
 
     if (!AI_SYSTEM_LABELS[system]) {
-        return res.status(400).json({ error: '不支援的 AI 判讀類型' });
+        return res.status(400).json({ error: '不支援的 AI 解讀類型' });
     }
 
     if (!prompt) {
-        return res.status(400).json({ error: '缺少 AI 判讀 prompt' });
+        return res.status(400).json({ error: '缺少 AI 解讀 prompt' });
+    }
+
+    if (prompt.length > AI_PROMPT_MAX_CHARS) {
+        return res.status(413).json({ error: `AI 提示詞過長，上限為 ${AI_PROMPT_MAX_CHARS} 字元。` });
+    }
+
+    if (!checkAiUsageLimit(req.user.userId, system)) {
+        return res.status(429).json({ error: 'AI 解讀次數已達本時段上限，請稍後再試。' });
     }
 
     try {
@@ -509,7 +614,7 @@ app.post('/api/ai/reading', authenticateToken, async (req, res) => {
         res.json({ system, label: AI_SYSTEM_LABELS[system], report });
     } catch (error) {
         console.error('Gemini reading failed:', error.response?.data || error.message);
-        res.status(error.statusCode || 500).json({ error: 'AI 判讀暫時無法完成，請稍後再試。' });
+        res.status(error.statusCode || 500).json({ error: 'AI 解讀暫時無法完成，請稍後再試。' });
     }
 });
 
@@ -632,5 +737,9 @@ app.delete('/api/history/:system/:id', authenticateToken, async (req, res) => {
     }
 });
 
-app.listen(PORT, () => { //啟動 Express 伺服器，監聽指定的 PORT 埠號。監聽完，執行後續函式
-    console.log(`Mystic Master API 正在埠號 ${PORT} `);});
+app.listen(PORT, () => {
+    console.log(`Mystic Master API listening on port ${PORT}`);
+});
+
+
+

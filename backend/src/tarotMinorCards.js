@@ -92,34 +92,34 @@ const existingImageUrls = {
 
 const majorArcana = [
   // [rank, title, subtitle, imageFile, accentColor, meaning]
-  ['0', 'The Fool', 'Air / Aleph', 'the fool.png', '#f6e27a', 'The first leap into the unknown, innocence, risk, and liberated beginning.'],
-  ['I', 'The Magus', 'Mercury / Beth', 'the magus.png', '#c7b7ff', 'Will, language, technique, and the focused act of manifestation.'],
-  ['II', 'The Priestess', 'Moon / Gimel', 'the priestess.png', '#d9d6ff', 'Hidden wisdom, silence, intuition, and the veil between worlds.'],
-  ['III', 'The Empress', 'Venus / Daleth', 'the empress.png', '#ff9bcf', 'Fertility, beauty, embodied creation, and the living power of attraction.'],
-  ['IV', 'The Emperor', 'Aries / Tzaddi', 'the emperor.png', '#ff6b42', 'Structure, authority, protection, and the sovereign force of form.'],
-  ['V', 'The Hierophant', 'Taurus / Vav', 'the hierophant.png', '#d5b56b', 'Initiation, teaching, tradition, and the channeling of sacred knowledge.'],
-  ['VI', 'The Lovers', 'Gemini / Zain', 'the lovers.png', '#ff83c6', 'Union, choice, polarity, and the alchemy of relationship.'],
-  ['VII', 'The Chariot', 'Cancer / Cheth', 'the chariot.png', '#7bbcff', 'Movement, protection, discipline, and the vehicle of the will.'],
-  ['VIII', 'Adjustment', 'Libra / Lamed', 'adjustment.png', '#b8a1ff', 'Equilibrium, exact balance, karma, and the intelligence of correction.'],
-  ['IX', 'The Hermit', 'Virgo / Yod', 'the hermit.png', '#d8c488', 'Solitude, inner guidance, refinement, and the lantern of hidden truth.'],
-  ['X', 'Fortune', 'Jupiter / Kaph', 'fortune.png', '#f0c64b', 'Cycles, turning fate, opportunity, and the wheel of change.'],
-  ['XI', 'Lust', 'Leo / Teth', 'lust.png', '#ff4f8f', 'Vital force, courage, desire, and the creative fire of embodiment.'],
-  ['XII', 'The Hanged Man', 'Water / Mem', 'the hanged man.png', '#68d7ff', 'Suspension, reversal, surrender, and wisdom through altered perspective.'],
-  ['XIII', 'Death', 'Scorpio / Nun', 'death.png', '#77e0bd', 'Transformation, release, ending, and the clearing power of renewal.'],
-  ['XIV', 'Art', 'Sagittarius / Samekh', 'art.png', '#ffa95f', 'Fusion, tempering, synthesis, and the sacred craft of integration.'],
-  ['XV', 'The Devil', 'Capricorn / Ayin', 'the devil.png', '#9d6bff', 'Material force, instinct, bondage, and the shadow of desire.'],
-  ['XVI', 'The Tower', 'Mars / Peh', 'the tower.png', '#ff5f5f', 'Sudden revelation, collapse of false forms, and disruptive liberation.'],
-  ['XVII', 'The Star', 'Aquarius / Tzaddi', 'the star.png', '#83d9ff', 'Hope, renewal, spacious vision, and the healing current of the future.'],
-  ['XVIII', 'The Moon', 'Pisces / Qoph', 'the moon.png', '#9eb2ff', 'Dream, fear, threshold, and the uncertain path through the unconscious.'],
-  ['XIX', 'The Sun', 'Sun / Resh', 'the sun.png', '#ffd36a', 'Radiance, clarity, success, and the generous center of life.'],
-  ['XX', 'The Aeon', 'Fire and Spirit / Shin', 'the aeon.png', '#ff8a5c', 'Awakening, judgment, rebirth, and the call of a new age.'],
-  ['XXI', 'The Universe', 'Saturn / Tau', 'the universe.png', '#c6b6ff', 'Completion, embodiment, totality, and the dance of all worlds.']
+  ['0', 'The Fool', '風元素 / Aleph', 'the fool.png', '#f6e27a', '跳向未知、純真、冒險，以及重新開始的自由。'],
+  ['I', 'The Magus', '水星 / Beth', 'the magus.png', '#c7b7ff', '意志、語言、技巧，以及把想法落實成形的專注力量。'],
+  ['II', 'The Priestess', '月亮 / Gimel', 'the priestess.png', '#d9d6ff', '隱藏智慧、沉默、直覺，以及通往潛意識的帷幕。'],
+  ['III', 'The Empress', '金星 / Daleth', 'the empress.png', '#ff9bcf', '豐饒、美感、創造力，以及吸引與滋養的生命力量。'],
+  ['IV', 'The Emperor', '牡羊座 / Tzaddi', 'the emperor.png', '#ff6b42', '結構、權威、保護，以及讓事物成形的主權意志。'],
+  ['V', 'The Hierophant', '金牛座 / Vav', 'the hierophant.png', '#d5b56b', '傳承、教導、啟蒙，以及把神聖知識帶入現實的管道。'],
+  ['VI', 'The Lovers', '雙子座 / Zain', 'the lovers.png', '#ff83c6', '結合、選擇、關係中的兩極，以及相遇帶來的煉金變化。'],
+  ['VII', 'The Chariot', '巨蟹座 / Cheth', 'the chariot.png', '#7bbcff', '推進、保護、紀律，以及承載意志前行的載具。'],
+  ['VIII', 'Adjustment', '天秤座 / Lamed', 'adjustment.png', '#b8a1ff', '平衡、校準、因果，以及把失衡重新調整的智慧。'],
+  ['IX', 'The Hermit', '處女座 / Yod', 'the hermit.png', '#d8c488', '獨處、內在指引、精煉，以及在暗處照亮真相的燈。'],
+  ['X', 'Fortune', '木星 / Kaph', 'fortune.png', '#f0c64b', '循環、命運轉動、機會，以及局勢正在改變的節點。'],
+  ['XI', 'Lust', '獅子座 / Teth', 'lust.png', '#ff4f8f', '生命力、勇氣、欲望，以及把本能轉化為創造的火焰。'],
+  ['XII', 'The Hanged Man', '水元素 / Mem', 'the hanged man.png', '#68d7ff', '停頓、反轉、臣服，以及從不同視角獲得智慧。'],
+  ['XIII', 'Death', '天蠍座 / Nun', 'death.png', '#77e0bd', '轉化、釋放、結束，以及讓舊形態退場的更新力量。'],
+  ['XIV', 'Art', '射手座 / Samekh', 'art.png', '#ffa95f', '調和、融合、煉金整合，以及把衝突素材轉成藝術的能力。'],
+  ['XV', 'The Devil', '摩羯座 / Ayin', 'the devil.png', '#9d6bff', '物質力量、本能、束縛，以及慾望陰影中的功課。'],
+  ['XVI', 'The Tower', '火星 / Peh', 'the tower.png', '#ff5f5f', '突發揭露、虛假結構崩解，以及被迫覺醒後的解放。'],
+  ['XVII', 'The Star', '水瓶座 / Tzaddi', 'the star.png', '#83d9ff', '希望、療癒、遠景，以及來自未來的清澈指引。'],
+  ['XVIII', 'The Moon', '雙魚座 / Qoph', 'the moon.png', '#9eb2ff', '夢境、恐懼、門檻，以及穿越潛意識迷霧的路。'],
+  ['XIX', 'The Sun', '太陽 / Resh', 'the sun.png', '#ffd36a', '清明、成功、喜悅，以及生命中心穩定散發的光。'],
+  ['XX', 'The Aeon', '火與靈 / Shin', 'the aeon.png', '#ff8a5c', '覺醒、審判、重生，以及新階段召喚你回應。'],
+  ['XXI', 'The Universe', '土星 / Tau', 'the universe.png', '#c6b6ff', '完成、整合、圓滿，以及一個循環抵達總結。']
 ];
 
 const minorArcana = [
   // [rank, title, subtitle, accentColor, meaning]
   ['WANDS', [
-    ['ace', 'Ace of Wands', 'Root of Fire', '#ff8a3d', 'A vertical staff of living fire, the first spark of will.'],
+    ['ace', 'Ace of Wands', '火元素根源', '#ff8a3d', '意志的第一道火花，新的行動力與熱情正在升起。'],
     ['two', 'Dominion', 'Two of Wands', '#ff6633', 'A poised force of command, ambition, and directed courage.'],
     ['three', 'Virtue', 'Three of Wands', '#ff9d4d', 'Stable creative fire, confidence, and honorable expansion.'],
     ['four', 'Completion', 'Four of Wands', '#ffc45a', 'A contained flame temple, arrival, harmony, and celebration.'],
@@ -129,13 +129,13 @@ const minorArcana = [
     ['eight', 'Swiftness', 'Eight of Wands', '#ffb84d', 'Eight streaking rods like meteors, motion and rapid messages.'],
     ['nine', 'Strength', 'Nine of Wands', '#ff7a2f', 'A protected inner flame, resilience, stamina, and recovery.'],
     ['ten', 'Oppression', 'Ten of Wands', '#9e2f2f', 'Heavy crossed rods, pressure, overload, and the cost of force.'],
-    ['knight', 'Knight of Wands', 'Court of Fire', '#ff6b2b', 'A charging solar guardian of impulse, heat, and bold action.'],
-    ['queen', 'Queen of Wands', 'Court of Fire', '#ff8f57', 'A magnetic flame sovereign, charisma, instinct, and command.'],
-    ['prince', 'Prince of Wands', 'Court of Fire', '#ffae42', 'A swift prince in a chariot of sparks, vision and movement.'],
-    ['princess', 'Princess of Wands', 'Court of Fire', '#ffc166', 'A young keeper of sacred flame, discovery and brave beginning.']
+    ['knight', 'Knight of Wands', '火元素宮廷牌', '#ff6b2b', '強烈的行動、衝勁與果斷，提醒你掌握熱情的方向。'],
+    ['queen', 'Queen of Wands', '火元素宮廷牌', '#ff8f57', '魅力、直覺與掌控力，讓創造力成為可被信任的火。'],
+    ['prince', 'Prince of Wands', '火元素宮廷牌', '#ffae42', '快速推進的視野與企圖心，適合把靈感帶上路。'],
+    ['princess', 'Princess of Wands', '火元素宮廷牌', '#ffc166', '新冒險的火種、勇氣與探索，正召喚你踏出第一步。']
   ]],
   ['CUPS', [
-    ['ace', 'Ace of Cups', 'Root of Water', '#6ee7ff', 'A chalice overflowing with lunar water, blessing and receptivity.'],
+    ['ace', 'Ace of Cups', '水元素根源', '#6ee7ff', '感受、祝福與接納的源頭，內在柔軟處正在重新流動。'],
     ['two', 'Love', 'Two of Cups', '#ff5fbf', 'Two radiant cups joined by bright rose and blue water, affection and union.'],
     ['three', 'Abundance', 'Three of Cups', '#7fe7c8', 'Three vessels overflowing with generous emotional fullness.'],
     ['four', 'Luxury', 'Four of Cups', '#b983ff', 'Moonlit cups in velvet water, pleasure, softness, and saturation.'],
@@ -145,13 +145,13 @@ const minorArcana = [
     ['eight', 'Indolence', 'Eight of Cups', '#4a72a8', 'Still water and fading cups, stagnation, heaviness, and withdrawal.'],
     ['nine', 'Happiness', 'Nine of Cups', '#71f2d1', 'A fountain of nine cups, emotional satisfaction and blessing.'],
     ['ten', 'Satiety', 'Ten of Cups', '#7cc9ff', 'A full water circuit, completion, peace, and emotional fullness.'],
-    ['knight', 'Knight of Cups', 'Court of Water', '#76d9ff', 'A lunar knight carrying a sacred cup through deep water.'],
-    ['queen', 'Queen of Cups', 'Court of Water', '#a78bfa', 'A reflective queen veiled in water, intuition, dream, and care.'],
-    ['prince', 'Prince of Cups', 'Court of Water', '#5fd4ff', 'A calm prince steering a vessel through the astral sea.'],
-    ['princess', 'Princess of Cups', 'Court of Water', '#ff92d0', 'A young oracle with a pearl cup, wonder, tenderness, and vision.']
+    ['knight', 'Knight of Cups', '水元素宮廷牌', '#76d9ff', '帶著情感前進的溫柔力量，適合誠實面對渴望。'],
+    ['queen', 'Queen of Cups', '水元素宮廷牌', '#a78bfa', '深層直覺、照顧與夢境感受，提醒你相信內在波動。'],
+    ['prince', 'Prince of Cups', '水元素宮廷牌', '#5fd4ff', '情感想像與浪漫投射，需要在夢與現實之間取得平衡。'],
+    ['princess', 'Princess of Cups', '水元素宮廷牌', '#ff92d0', '純真感受、新愛意與靈感，像一封來自心底的訊息。']
   ]],
   ['SWORDS', [
-    ['ace', 'Ace of Swords', 'Root of Air', '#e6ecff', 'A blade of clear light, truth, focus, and decisive perception.'],
+    ['ace', 'Ace of Swords', '風元素根源', '#e6ecff', '清明的念頭、真相與判斷力，讓混亂被一刀切開。'],
     ['two', 'Peace', 'Two of Swords', '#a9c4ff', 'Two balanced blades under a quiet moon, truce and mental stillness.'],
     ['three', 'Sorrow', 'Three of Swords', '#8c96c8', 'Three blades crossing a violet storm, grief, clarity, and pain.'],
     ['four', 'Truce', 'Four of Swords', '#b5c7ff', 'Four resting blades in a geometric sanctuary, pause and recovery.'],
@@ -161,13 +161,13 @@ const minorArcana = [
     ['eight', 'Interference', 'Eight of Swords', '#858fc4', 'Eight blades forming a cage, obstruction and mental noise.'],
     ['nine', 'Cruelty', 'Nine of Swords', '#6f78a8', 'Nine sharp blades in a dark lattice, anxiety and harsh thought.'],
     ['ten', 'Ruin', 'Ten of Swords', '#545d8c', 'Ten descending blades, collapse, finality, and release of illusion.'],
-    ['knight', 'Knight of Swords', 'Court of Air', '#d5deff', 'A windborne knight with a silver blade, speed and precision.'],
-    ['queen', 'Queen of Swords', 'Court of Air', '#bcc8ff', 'A clear-eyed queen of air, discernment, independence, and truth.'],
-    ['prince', 'Prince of Swords', 'Court of Air', '#aab7ff', 'A calculating prince among glass wings, strategy and intellect.'],
-    ['princess', 'Princess of Swords', 'Court of Air', '#e1e7ff', 'A vigilant young blade bearer, curiosity and sharp perception.']
+    ['knight', 'Knight of Swords', '風元素宮廷牌', '#d5deff', '速度、精準與直接行動，也提醒你避免過度急切。'],
+    ['queen', 'Queen of Swords', '風元素宮廷牌', '#bcc8ff', '冷靜辨識、獨立判斷與真話，讓界線變得清楚。'],
+    ['prince', 'Prince of Swords', '風元素宮廷牌', '#aab7ff', '策略、分析與快速推演，適合把思緒整理成計畫。'],
+    ['princess', 'Princess of Swords', '風元素宮廷牌', '#e1e7ff', '觀察、提問與警覺，幫助你看見被忽略的細節。']
   ]],
   ['DISKS', [
-    ['ace', 'Ace of Disks', 'Root of Earth', '#d8b45a', 'A radiant golden disk rooted in stone, manifestation and seed value.'],
+    ['ace', 'Ace of Disks', '土元素根源', '#d8b45a', '資源、身體感與實際機會正在萌芽，適合把願望落地。'],
     ['two', 'Change', 'Two of Disks', '#6fd18c', 'Two disks in a turning serpent loop, adaptation and exchange.'],
     ['three', 'Works', 'Three of Disks', '#b8a15d', 'Three disks in a craft temple, skill, labor, and structure.'],
     ['four', 'Power', 'Four of Disks', '#c6a24d', 'Four disks as a fortress seal, stability, possession, and control.'],
@@ -177,10 +177,10 @@ const minorArcana = [
     ['eight', 'Prudence', 'Eight of Disks', '#8fc16f', 'Eight disks as careful seeds, craft, patience, and cultivation.'],
     ['nine', 'Gain', 'Nine of Disks', '#c9b35b', 'Nine disks blooming like mineral flowers, profit and refinement.'],
     ['ten', 'Wealth', 'Ten of Disks', '#d9bd67', 'Ten disks in a complete earth mandala, inheritance and abundance.'],
-    ['knight', 'Knight of Disks', 'Court of Earth', '#bfa45a', 'A steady guardian of fields and stone, endurance and provision.'],
-    ['queen', 'Queen of Disks', 'Court of Earth', '#9fbf76', 'A fertile earth queen, protection, patience, and embodied wisdom.'],
-    ['prince', 'Prince of Disks', 'Court of Earth', '#c2a85f', 'A prince of harvest machines and stone geometry, method and growth.'],
-    ['princess', 'Princess of Disks', 'Court of Earth', '#d6bd78', 'A young earth keeper with a seed disk, potential and care.']
+    ['knight', 'Knight of Disks', '土元素宮廷牌', '#bfa45a', '穩定、耐力與可靠執行，提醒你一步一步守住成果。'],
+    ['queen', 'Queen of Disks', '土元素宮廷牌', '#9fbf76', '照顧身體、土地與生活品質，讓安全感成為可居住的現實。'],
+    ['prince', 'Prince of Disks', '土元素宮廷牌', '#c2a85f', '規劃、生產與長期建設，把資源慢慢養成成果。'],
+    ['princess', 'Princess of Disks', '土元素宮廷牌', '#d6bd78', '潛力、孕育與新資源，像種子一樣等待合適季節發芽。']
   ]]
 ];
 
