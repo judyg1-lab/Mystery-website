@@ -556,7 +556,7 @@ const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', heig
 const topNavBar = {
   boxSizing: 'border-box',
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '80px', padding: '0 40px',
-  position: 'fixed', top: 0, width: '100%', zIndex: 100, borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  position: 'fixed', top: 0, width: '100%', zIndex: 1000, pointerEvents: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(1px)'
 };
 const navBrandStyle = { color: '#d4af37', letterSpacing: '4px', fontSize: '1rem', minWidth: '250px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 };

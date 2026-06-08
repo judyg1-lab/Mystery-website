@@ -196,6 +196,17 @@ export default function AstrologyResult({
       </main>
 
       <div style={actionBar} data-html2canvas-ignore="true">
+        <div style={timingActions}>
+          {[
+            ['year', '流年'],
+            ['month', '流月'],
+            ['day', '流日']
+          ].map(([key, label]) => (
+            <button key={key} type="button" className="action-btn timing-btn" onClick={() => runAiReading?.(key)} disabled={isAiReading}>
+              <CalendarDays size={13} /> {label}
+            </button>
+          ))}
+        </div>
         <div style={promptWrap}>
           <button type="button" className="action-btn" onClick={() => setShowPromptMenu((open) => !open)}>
             <Copy size={14} /> 複製 Prompt 給 AI
@@ -311,6 +322,7 @@ const tips = { display: 'grid', gap: 4, color: 'rgba(255,255,255,0.65)', lineHei
 
 const actionBar = { gridColumn: '1 / -1', zIndex: 2, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: '4px 30px 0', alignItems: 'center' };
 const promptWrap = { position: 'relative', minWidth: 0 };
+const timingActions = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' };
 
 const promptMenu = { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 20, display: 'grid', gap: 4, padding: 4, borderRadius: 4, border: '1px solid rgba(80,250,123,0.3)', background: 'rgba(0,10,7,0.95)', boxShadow: '0 10px 20px rgba(0,0,0,0.5), 0 0 10px rgba(80,250,123,0.1)' };
 const favoriteButton = (active) => ({ position: 'absolute', top: 12, right: 16, zIndex: 8, width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '1px solid rgba(80,250,123,0.3)', background: active ? 'rgba(80,250,123,0.15)' : 'rgba(0,0,0,0.2)', color: active ? green : 'rgba(80,250,123,0.6)', cursor: 'pointer' });

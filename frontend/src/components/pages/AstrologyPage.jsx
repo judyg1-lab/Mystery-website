@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, History, Sparkles, ScrollText, Download, Heart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Pencil, ChevronLeft } from 'lucide-react';
+import { Pencil, ChevronLeft, Trash2 } from 'lucide-react';
 import ProfileIcon from '../ProfileIcon';
 import BackBtn from '../backBtn';
 import MysticModal from '../MysticModal';
@@ -98,6 +98,11 @@ export default function AstrologyPage() {
   const [articles, setArticles] = useState([]);      // 存放從資料庫撈出來的真實文章
   const [dbFavorites, setDbFavorites] = useState([]);  // 存放使用者目前的收藏紀錄
   const [historyLogs, setHistoryLogs] = useState([]); // 存放過去星盤解析的歷史紀錄
+
+  const [renameDraft, setRenameDraft] = useState('');
+  const closeMysticModal = useCallback(() => {
+    setModalConfig(prev => ({ ...prev, isOpen: false, mode: null }));
+  }, []);
 
   const [modalConfig, setModalConfig] = useState({
     isOpen: false, title: '', message: '', confirmText: '確認', cancelText: '取消', type: 'info', onConfirm: () => {}
@@ -272,7 +277,6 @@ export default function AstrologyPage() {
     }
   };
 
-  // 處理歷史紀錄點擊愛心
   const handleHistoryHeartClick = async (e, rec) => {
     if (e) e.stopPropagation();
     const token = localStorage.getItem("mystic_token");
@@ -307,6 +311,69 @@ export default function AstrologyPage() {
       } catch (err) { console.error("歷史占卜收藏失敗:", err); }
     }
   };
+  const executeRenameHistory = async (rec) => {
+  const token = localStorage.getItem('mystic_token');
+  if (!token) return;
+  const nextTitle = renameDraft.trim();
+  if (!nextTitle || nextTitle === rec.title) { closeMysticModal(); return; }
+  try {
+    const res = await fetch(`http://localhost:5000/api/history/astrology/${rec.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ title: nextTitle.trim() })
+    });
+    const data = await res.json();
+    if (res.ok && data.history) {
+      setHistoryLogs(prev => prev.map(log => log.id === rec.id ? data.history : log));
+      closeMysticModal();
+    }
+  } catch (err) { console.error('Rename astrology history failed:', err); }
+  };
+
+  const handleRenameHistory = (e, rec) => {
+    if (e) e.stopPropagation();
+    setRenameDraft(rec.title || '');
+    setModalConfig({
+      isOpen: true, title: '重新命名命盤紀錄', message: '',
+      confirmText: '儲存', cancelText: '取消', type: 'info', mode: 'rename',
+      onConfirm: () => executeRenameHistory(rec)
+    });
+  };
+
+const executeDeleteHistory = async (rec) => {
+  const token = localStorage.getItem('mystic_token');
+  if (!token) return;
+  try {
+    const res = await fetch(`http://localhost:5000/api/history/astrology/${rec.id}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      setHistoryLogs(prev => prev.filter(log => log.id !== rec.id));
+      if (selectedItemId === rec.id) { setSelectedItemId(null); setSelectedType(null); }
+      await fetchUserFavorites();
+      closeMysticModal();
+    }
+  } catch (err) { console.error('Delete astrology history failed:', err); }
+};
+
+const handleDeleteHistory = (e, rec) => {
+  if (e) e.stopPropagation();
+  setModalConfig({
+    isOpen: true, title: '刪除命盤紀錄',
+    message: `確定要刪除「${rec.title || '未命名紀錄'}」這筆命盤紀錄嗎？`,
+    confirmText: '刪除', cancelText: '取消', type: 'danger', mode: null,
+    onConfirm: () => executeDeleteHistory(rec)
+  });
+};
+useEffect(() => {
+  if (activeTab !== 'history') return;
+  const alreadySelected = selectedType === 'history' &&
+    filteredHistoryLogs.some(log => log.id === selectedItemId);
+  if (!alreadySelected && filteredHistoryLogs.length > 0) {
+    setSelectedItemId(filteredHistoryLogs[0].id);
+    setSelectedType('history');
+  }
+}, [activeTab, filteredHistoryLogs]);
 
   return (
     <div style={mainLayout}>
@@ -623,7 +690,7 @@ const canvasStyle = { position: 'absolute', top: 0, left: 0, width: '100%', heig
 const topNavBar = {
   boxSizing: 'border-box',
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '80px', padding: '0 40px',
-  position: 'fixed', top: 0, width: '100%', zIndex: 100, borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  position: 'fixed', top: 0, width: '100%', zIndex: 1000, pointerEvents: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(1px)'
 };
 const navBrandStyle = { color: '#d4af37', letterSpacing: '4px', fontSize: '1rem', minWidth: '250px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Star, Copy, Download, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
+import { Heart, Star, Copy, Download, ExternalLink, Sparkles, Loader2, CalendarDays } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReading, isAiReading, isFavorite, toggleFavorite, aiTargets = [] }) {
@@ -10,7 +10,7 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
   const [showPromptMenu, setShowPromptMenu] = useState(false);
 
   // 接收傳入的表單資料，若無則給予預設值防呆
-  const safeForm = form || { name: '未知名', gender: '未知', birthDate: 'YYYY/MM/DD', birthTime: '未知', birthPlace: '' };
+  const safeForm = form || { name: '未知名', gender: '未知', birthDate: '未填寫生日', birthTime: '未知', birthPlace: '' };
 
   const fortuneMetrics = [
     { label: '事業運', score: 88, color: 'linear-gradient(90deg, rgba(0,100,255,0.8), rgba(0,204,255,0.9))' },
@@ -239,6 +239,15 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
 
             {/* 🎯 按鈕移動到這裡！匯出按鈕掛上 handleExport 並且在匯出時有 Loading 狀態 */}
             <div data-html2canvas-ignore="true" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginTop: '18px', width: '100%', maxWidth: '390px' }}>
+            {[
+                ['year', '流年'],
+                ['month', '流月'],
+                ['day', '流日']
+            ].map(([key, label]) => (
+                <button key={key} className="glass-btn" onClick={() => runAiReading?.(key)} disabled={isAiReading}>
+                    <CalendarDays size={12} /> {label}
+                </button>
+            ))}
             <button className="glow-btn" onClick={runAiReading} disabled={isAiReading}>
                 {isAiReading ? <Loader2 size={14} style={{ animation: 'spin 2s linear infinite' }} /> : <Sparkles size={14} />}
                 {isAiReading ? 'AI 解讀中' : 'AI 智能解讀'}
