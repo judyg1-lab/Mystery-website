@@ -71,7 +71,7 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
         position: 'relative', 
         width: '100%', 
         height: '100%', 
-        padding: '24px 4% 20px', 
+        padding: '20px 3.4% 16px', 
         boxSizing: 'border-box',
         color: '#fff', 
         fontFamily: "'Noto Serif TC', serif",
@@ -161,14 +161,14 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
           <Heart size={18} fill={isFavorite ? '#00ccff' : 'transparent'} />
         </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 1fr) 1.8fr', gap: '40px', flex: 1, alignItems: 'stretch' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(330px, 0.92fr) 1.88fr', gap: '30px', flex: 1, alignItems: 'stretch' }}>
         
         {/* =========================================
             左側欄：標題 -> 縮小版 12宮格 -> 操作按鈕
         ========================================= */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             
-            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '0.65rem', color: 'rgba(0,204,255,0.7)', letterSpacing: '0.25em', textTransform: 'uppercase' }}>Zi Wei Dou Shu Result</div>
             <h1 style={{ 
                 fontSize: '2rem', fontWeight: 300, margin: '6px 0 0', letterSpacing: '0.15em', 
@@ -177,14 +177,14 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
             </div>
 
             <div style={{ 
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '4px', 
-            background: 'rgba(2, 8, 16, 0.5)', padding: '6px', borderRadius: '8px', 
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)', gap: '3px', 
+            background: 'rgba(2, 8, 16, 0.5)', padding: '4px', borderRadius: '8px', 
             border: '1px solid rgba(0, 204, 255, 0.2)', aspectRatio: '1', width: '100%',
             maxWidth: '390px'
             }}>
             {safePalaces.map((p, idx) => (
                 <motion.div key={idx} style={{
-                    ...gridPositions[idx], border: '1px solid rgba(0, 204, 255, 0.1)', borderRadius: '4px', padding: '6px',
+                    ...gridPositions[idx], border: '1px solid rgba(0, 204, 255, 0.1)', borderRadius: '4px', padding: '4px',
                     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                     background: 'linear-gradient(135deg, rgba(0, 20, 40, 0.4), rgba(0, 5, 15, 0.7))', cursor: 'pointer'
                 }}
@@ -238,7 +238,7 @@ export default function ZiWeiResult({ data, system, form, copyPrompt, runAiReadi
             </div>
 
             {/* 🎯 按鈕移動到這裡！匯出按鈕掛上 handleExport 並且在匯出時有 Loading 狀態 */}
-            <div data-html2canvas-ignore="true" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginTop: '28px', width: '100%', maxWidth: '390px' }}>
+            <div data-html2canvas-ignore="true" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px', marginTop: '18px', width: '100%', maxWidth: '390px' }}>
             <button className="glow-btn" onClick={runAiReading} disabled={isAiReading}>
                 {isAiReading ? <Loader2 size={14} style={{ animation: 'spin 2s linear infinite' }} /> : <Sparkles size={14} />}
                 {isAiReading ? 'AI 解讀中' : 'AI 智能解讀'}

@@ -104,6 +104,23 @@ function createPrompt(system, form, result) {
   ].join('\n');
 }
 
+function createInitialPrompt(system, form, result) {
+  return [
+    `你是一位${system.title}諮詢師。請根據使用者剛生成的命盤資料，先提供一份「基礎報告」。`,
+    '請用繁體中文，語氣清楚、溫柔、具體；這份報告是結果頁初始摘要，不要太長，也不要恐嚇式斷言。',
+    `姓名：${form.name}`,
+    `性別：${form.gender}`,
+    `出生日期：${form.birthDate || '未填'}`,
+    `出生時間：${form.birthTime || '未填'}`,
+    `出生地：${form.birthPlace || '未填'}`,
+    `想問方向：${form.question || '整體命盤'}`,
+    '',
+    `命盤資料：${JSON.stringify(result.data, null, 2)}`,
+    '',
+    '請輸出 4 段：1. 命盤主軸；2. 當前優勢；3. 近期提醒；4. 一句總結。每段 2-3 句即可。'
+  ].join('\n');
+}
+
 function createReport(system, form, result) {
   const focus = result.data.focus || result.data.pillars?.map((pillar) => pillar.branch).join('、') || result.data.planets?.[0]?.sign;
   return `${form.name} 的${system.title}判讀已完成。\n\n核心訊號：${focus}\n\n目前盤面顯示你正處在整理能量、重排目標、讓選擇重新對齊的階段。適合先收斂干擾，再把關鍵問題拆成可以行動的步驟。\n\n建議：\n1. 先確認最想改變的一件事，不要同時處理太多方向。\n2. 近期對人際與合作保持清楚邊界。\n3. 把直覺寫下來，三天後回看，通常會看到真正的答案。`;
@@ -280,10 +297,29 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
     setMode('loading');
     window.setTimeout(async () => {
       const generated = buildResult(systemKey, form);
-      const saved = await persistHistory(generated);
+      const report = await generateInitialReport(generated);
+      const saved = await persistHistory({ ...generated, report });
       setResult(saved);
       setMode('result');
     }, 1700);
+  }
+
+  async function generateInitialReport(generated) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai/reading`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          system: system.api,
+          prompt: createInitialPrompt(system, generated.form, generated)
+        })
+      });
+      const data = await response.json();
+      return response.ok && data.report ? data.report : createReport(system, generated.form, generated);
+    } catch (error) {
+      console.error('Initial chart reading failed:', error);
+      return createReport(system, generated.form, generated);
+    }
   }
 
   async function copyPrompt(openUrl) {
@@ -518,18 +554,27 @@ export default function MysticChartTool({ systemKey, view = 'drawing', targetHis
                   style={historySearchInput(system)}
                 />
                 {filteredHistory.length === 0 ? <div style={emptyState}>尚未留下紀錄。完成一次推演後，這裡會自動保存。</div> : filteredHistory.map((item) => (
-                  <div key={item.id} style={historyItem(system, selectedHistory?.id === item.id)} onClick={() => openHistory(item)}>
-                    <span><b>{item.title || '未命名標題'}</b><small>{item.date}</small></span>
-                    <span style={historyActionGroup}>
-                      <button type="button" style={historyIconButton(system)} onClick={(event) => requestRenameHistory(event, item)} title="重新命名">
-                        <Pencil size={15} />
-                      </button>
-                      <button type="button" style={historyIconButton(system)} onClick={(event) => requestDeleteHistory(event, item)} title="刪除">
-                        <Trash2 size={15} />
-                      </button>
-                      {item.isFavorite && <Heart size={16} fill={system.accent} color={system.accent} />}
+                  <button key={item.id} style={historyItem(system, selectedHistory?.id === item.id)} onClick={() => openHistory(item)}>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                      <small style={{
+                        fontSize: '0.75rem',
+                        color: system.accent,
+                        letterSpacing: '2px',
+                        fontWeight: 'bold',
+                        fontFamily: 'Cinzel, serif'
+                      }}>
+                        {item.date}
+                      </small>
+                      <span style={{
+                        color: '#888',
+                        fontSize: '0.95rem',
+                        fontFamily: "'Noto Serif TC', serif"
+                      }}>
+                        {item.title}
+                      </span>
                     </span>
-                  </div>
+                    {item.isFavorite && <Heart size={16} fill={system.accent} color={system.accent} />}
+                  </button>
                 ))}
               </aside>
               <main style={historyContent(system)}>
@@ -616,9 +661,22 @@ function ResultView({ systemKey, system, result, favorites, showPromptMenu, setS
           aiTargets={AI_TARGETS}
         />
       )}
-      {systemKey === 'astrology' && <AstrologyResult data={result.data} system={system} form={result.form}  />}
+      {systemKey === 'astrology' && (
+        <AstrologyResult
+          data={result.data}
+          system={system}
+          form={result.form}
+          report={result.report}
+          copyPrompt={copyPrompt}
+          runAiReading={runAiReading}
+          isAiReading={isAiReading}
+          isFavorite={favorites.some((item) => item.historyId === result.id)}
+          toggleFavorite={toggleFavorite}
+          aiTargets={AI_TARGETS}
+        />
+      )}
   
-      {result.report && !['ziwei', 'bazi'].includes(systemKey) && <pre style={reportBox(system)}>{result.report}</pre>}
+      {result.report && !['ziwei', 'bazi', 'astrology'].includes(systemKey) && <pre style={reportBox(system)}>{result.report}</pre>}
     </>
   );
 }
