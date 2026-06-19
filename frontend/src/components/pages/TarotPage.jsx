@@ -255,7 +255,7 @@ const TarotCardVisual = ({ item, entry }) => (
 );
 
 // ─── TarotHistoryReport ──────────────────────────────────────────────────────
-function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, onAiReading, isAiReading }) {
+function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, onAiReading, isAiReading, onFavoriteToggle }) {
   const spreadName = reading?.spread?.name || record?.title || 'Tarot Reading';
   const dateText = record?.date || '';
   const soulMaster = reading?.soulMaster || '─';
@@ -285,10 +285,16 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
         </div>
         <motion.div
           style={thHeartBtn}
+          onClick={(e) => onFavoriteToggle?.(e, record)}
           whileHover={{ scale: 1.12, filter: 'drop-shadow(0 0 10px rgba(188,19,254,0.7))' }}
           whileTap={{ scale: 0.9 }}
         >
-          <Heart size={18} color="#bc13fe" />
+          <Heart
+            size={18}
+            color="#bc13fe"
+            fill={record?.isFavorite ? '#bc13fe' : 'transparent'}
+            style={{ transition: '0.2s' }}
+          />
         </motion.div>
       </header>
 
@@ -1261,6 +1267,7 @@ export default function TarotPage() {
                         onCopyPrompt={handleHistoryCopyPrompt}
                         onAiReading={handleHistoryAiReading}
                         isAiReading={isHistoryAiReading}
+                        onFavoriteToggle={handleHistoryHeartClick}
                       />
                     ) : (
                       <>

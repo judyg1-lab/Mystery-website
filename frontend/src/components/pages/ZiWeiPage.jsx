@@ -201,9 +201,16 @@ export default function ZiWeiPage() {
 
   const selectedArticle = processedArticles.find(item => item.id === selectedItemId);
   const selectedHistory = historyLogs.find(log => log.id === selectedItemId);
+  const selectedHistoryFavorite = selectedHistory
+    ? dbFavorites.find(fav => fav.historyId == selectedHistory.id)
+    : null;
   const selectedItem = selectedType === 'article'
     ? (selectedArticle ? { ...selectedArticle } : null)
-    : (selectedHistory ? { ...selectedHistory } : null);
+    : (selectedHistory ? {
+        ...selectedHistory,
+        isFavorite: Boolean(selectedHistoryFavorite),
+        favoriteId: selectedHistoryFavorite?.id || selectedHistory.favoriteId || null
+      } : null);
 
   useEffect(() => {
     if (!['origins', 'codex'].includes(activeTab)) {
@@ -519,8 +526,26 @@ export default function ZiWeiPage() {
                   <AnimatePresence mode="wait">
                     {selectedItem ? (
                       <motion.div key={selectedItem.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                        <h2 style={goldLabel}>REPORT {selectedItem.date}</h2>
-                        <h1 style={mainTitle}>{selectedItem.title}</h1>
+                        <div style={historyReportHeader}>
+                          <div>
+                            <h2 style={goldLabel}>REPORT {selectedItem.date}</h2>
+                            <h1 style={mainTitle}>{selectedItem.title}</h1>
+                          </div>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.12, filter: `drop-shadow(0 0 10px ${ACCENT})` }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => handleHistoryHeartClick(e, selectedItem)}
+                            style={historyDetailHeartBtn}
+                          >
+                            <Heart
+                              size={19}
+                              fill={selectedItem.isFavorite ? ACCENT : 'transparent'}
+                              color={selectedItem.isFavorite ? ACCENT : '#555'}
+                              style={{ transition: '0.2s' }}
+                            />
+                          </motion.button>
+                        </div>
                         <div style={divider} />
                         <p style={detailText}>{selectedItem.content || selectedItem.report}</p>
                         <button style={invokeGateBtn}>
@@ -578,6 +603,8 @@ const detailWrapper = {
   borderRadius: '8px', padding: '40px 80px', border: '1px solid rgba(0,204,255,0.14)',
   backdropFilter: 'blur(1.5px)', boxShadow: 'inset 0 0 28px rgba(0,204,255,0.08)'
 };
+const historyReportHeader = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '18px' };
+const historyDetailHeartBtn = { width: 48, height: 48, borderRadius: '50%', border: '1px solid rgba(0,204,255,0.35)', background: 'rgba(0,204,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 0 18px rgba(0,204,255,0.16)', flexShrink: 0 };
 const searchBox = { display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255, 255, 255, 0.05)', padding: '12px 18px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: '20px' };
 const searchInput = { background: 'none', border: 'none', color: '#fff', outline: 'none', fontSize: '0.85rem', width: '100%' };
 const sidebarList = { display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 };

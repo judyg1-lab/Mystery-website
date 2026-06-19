@@ -38,12 +38,20 @@ const avatarUpload = (req, res, next) => {
 
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'avatars';
 
+class AppError extends Error {
+    constructor(message, status = 500, code = 'INTERNAL_ERROR') {
+        super(message);
+        this.status = status;
+        this.code = code;
+    }
+}
+
 function getSupabaseStorageConfig() {
     const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-        throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+        throw new AppError('Supabase Storage environment variables are not configured', 500, 'SUPABASE_STORAGE_CONFIG_MISSING');
     }
 
     return { supabaseUrl, serviceRoleKey };
@@ -60,15 +68,20 @@ async function uploadAvatarToSupabase(userId, file) {
     const objectPath = `users/${userId}/avatar-${Date.now()}-${Math.round(Math.random() * 1E9)}${safeExt}`;
     const uploadUrl = `${supabaseUrl}/storage/v1/object/${SUPABASE_STORAGE_BUCKET}/${encodeStoragePath(objectPath)}`;
 
-    await axios.post(uploadUrl, file.buffer, {
-        headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-            'Content-Type': file.mimetype || 'application/octet-stream',
-            'x-upsert': 'true'
-        },
-        maxBodyLength: Infinity
-    });
+    try {
+        await axios.post(uploadUrl, file.buffer, {
+            headers: {
+                apikey: serviceRoleKey,
+                Authorization: `Bearer ${serviceRoleKey}`,
+                'Content-Type': file.mimetype || 'application/octet-stream',
+                'x-upsert': 'true'
+            },
+            maxBodyLength: Infinity
+        });
+    } catch (error) {
+        console.error('Supabase avatar upload failed:', error.response?.data || error.message);
+        throw new AppError('Supabase Storage upload failed', 500, 'SUPABASE_STORAGE_UPLOAD_FAILED');
+    }
 
     return `${supabaseUrl}/storage/v1/object/public/${SUPABASE_STORAGE_BUCKET}/${encodeStoragePath(objectPath)}`;
 }
@@ -158,7 +171,11 @@ app.post('/api/user/avatar', authenticateToken, avatarUpload, async (req, res) =
         res.json({ message: '頭像上傳成功', avatarUrl });
     } catch (error) {
         console.error('Avatar upload failed:', error.response?.data || error.message);
-        res.status(500).json({ error: '頭像上傳失敗' });
+        res.status(error.status || 500).json({
+            error: '頭像上傳失敗',
+            code: error.code || 'AVATAR_UPLOAD_FAILED',
+            detail: error.message
+        });
     }});
 
 app.put('/api/user/profile/update', authenticateToken, async (req, res) => {

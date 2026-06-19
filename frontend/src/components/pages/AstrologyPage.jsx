@@ -218,9 +218,16 @@ export default function AstrologyPage() {
   // 8. 尋獲目前被點開的文獻或歷史報告
   const selectedArticle = processedArticles.find(item => item.id === selectedItemId);
   const selectedHistory = historyLogs.find(log => log.id === selectedItemId);
+  const selectedHistoryFavorite = selectedHistory
+    ? dbFavorites.find(f => f.historyId == selectedHistory.id)
+    : null;
   const selectedItem = selectedType === 'article'
     ? (selectedArticle ? { ...selectedArticle } : null)
-    : (selectedHistory ? { ...selectedHistory } : null);
+    : (selectedHistory ? {
+        ...selectedHistory,
+        isFavorite: Boolean(selectedHistoryFavorite),
+        favoriteId: selectedHistoryFavorite?.id || selectedHistory.favoriteId || null
+      } : null);
 
   // 預設鎖定分頁第一篇文章
   useEffect(() => {
@@ -664,8 +671,26 @@ useEffect(() => {
                   <AnimatePresence mode="wait">
                     {selectedItem ? (
                       <motion.div key={selectedItem.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                        <h2 style={goldLabel}>REPORT — {selectedItem.date}</h2>
-                        <h1 style={mainTitle}>{selectedItem.title}</h1>
+                        <div style={historyReportHeader}>
+                          <div>
+                            <h2 style={goldLabel}>REPORT — {selectedItem.date}</h2>
+                            <h1 style={mainTitle}>{selectedItem.title}</h1>
+                          </div>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.12, filter: 'drop-shadow(0 0 10px rgba(80,250,123,0.7))' }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => handleHistoryHeartClick(e, selectedItem)}
+                            style={historyDetailHeartBtn}
+                          >
+                            <Heart
+                              size={19}
+                              fill={selectedItem.isFavorite ? '#50fa7b' : 'transparent'}
+                              color={selectedItem.isFavorite ? '#50fa7b' : '#555'}
+                              style={{ transition: '0.2s' }}
+                            />
+                          </motion.button>
+                        </div>
                         <div style={divider} />
                         <p style={detailText}>{selectedItem.content || selectedItem.report}</p>
                         <button style={invokeGateBtn}>
@@ -753,6 +778,8 @@ const mainTitle = {
 };
 const divider = { width: '60px', height: '2px', background: '#50fa7b', margin: '30px 0' };
 const detailText = { fontSize: '1.1rem', lineHeight: '1.9', color: 'rgba(255, 255, 255, 0.85)', marginBottom: '40px', fontFamily: 'Inter, sans-serif' };
+const historyReportHeader = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '18px' };
+const historyDetailHeartBtn = { width: 48, height: 48, borderRadius: '50%', border: '1px solid rgba(80,250,123,0.35)', background: 'rgba(80,250,123,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 0 18px rgba(80,250,123,0.18)', flexShrink: 0 };
 const quoteBox = { background: 'rgba(255, 255, 255, 0.02)', padding: '25px', borderRadius: '8px', borderLeft: '4px solid #50fa7b' };
 const quoteText = { fontSize: '0.9rem', fontStyle: 'italic', color: 'rgba(255, 255, 255, 0.4)' };
 const sidebarHeader = { padding: '0 10px 20px', fontFamily: 'Cinzel', letterSpacing: '4px', color: '#d4af37', fontSize: '0.8rem' };
