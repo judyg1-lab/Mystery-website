@@ -42,7 +42,7 @@ const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
 function validatePasswordStrength(password = '') {
     const lower = password.toLowerCase();
     const checks = [
-        password.length >= 12,
+        password.length >= 8,
         /[A-Z]/.test(password),
         /[a-z]/.test(password),
         /\d/.test(password),
@@ -55,7 +55,7 @@ function validatePasswordStrength(password = '') {
         return '密碼不可以使用大量重複字元';
     }
     if (checks.filter(Boolean).length < 5) {
-        return '密碼至少 12 碼，並包含大小寫英文、數字與符號';
+        return '密碼至少 8 碼，並包含大小寫英文、數字與符號';
     }
     return '';
 }

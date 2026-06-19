@@ -28,7 +28,7 @@ const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
 function evaluatePassword(password) {
   const lower = password.toLowerCase();
   const checks = [
-    password.length >= 12,
+    password.length >= 8,
     /[A-Z]/.test(password),
     /[a-z]/.test(password),
     /\d/.test(password),
@@ -41,7 +41,7 @@ function evaluatePassword(password) {
     return { ok: false, label: '重複過多', message: '密碼不可以使用大量重複字元。' };
   }
   if (checks.filter(Boolean).length < 5) {
-    return { ok: false, label: '強度不足', message: '密碼至少 12 碼，並包含大小寫英文、數字與符號。' };
+    return { ok: false, label: '強度不足', message: '密碼至少 8 碼，並包含大小寫英文、數字與符號。' };
   }
   return { ok: true, label: '強度良好', message: '密碼強度良好。' };
 }
@@ -331,7 +331,7 @@ export default function LoginPage() {
               <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="帳號，例如 xxx123 或 xxx_lab" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="電子郵件" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="電話號碼" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 12 碼，含大小寫、數字、符號" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 8 碼，含大小寫、數字、符號" style={inputStyle}/></div>
               <div style={inputWrapperStyle}>
                 <CheckCircle size={12} style={{...iconStyle, color: formData.password && formData.password === formData.confirmPassword ? '#00ffaa' : COLORS.textGray }}/>
                 <input name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} placeholder="再次輸入密碼" style={inputStyle}/>
