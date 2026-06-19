@@ -79,7 +79,6 @@ mystery/
 │  │  ├─ tarotMinorCards.js
 │  │  └─ spider.js
 │  ├─ public/
-│  ├─ uploads/
 │  └─ package.json
 ├─ package.json
 └─ README.md
@@ -157,7 +156,6 @@ AI:
 
 Static files:
 
-- `/uploads/*` - uploaded avatars
 - `/tarot/*` - tarot public assets
 
 ## Database
@@ -207,6 +205,12 @@ Required:
 Required only when AI reading is enabled:
 
 - `GEMINI_API_KEY`
+
+Required for avatar uploads:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET`
 
 Frontend `.env` or Vercel environment variable:
 
@@ -319,6 +323,9 @@ Required Render environment variables:
 DATABASE_URL="your-supabase-postgres-url"
 JWT_SECRET="your-secret"
 GEMINI_API_KEY="your-gemini-api-key"
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+SUPABASE_STORAGE_BUCKET="avatars"
 ```
 
 Optional Render environment variables:
@@ -393,6 +400,7 @@ npm run lint
 
 - `spider.js` is now a compatibility entry that runs the clean article seed. It no longer depends on web scraping.
 - `seedIfEmpty.js` is intended for Render free-tier deployments where Render Shell may not be available.
-- User-uploaded avatars are stored in `backend/uploads`. On Render free instances, local disk storage may not be permanent across redeploys unless persistent storage is configured.
+- User-uploaded avatars are stored in Supabase Storage. The database stores the public avatar URL in `User.avatarUrl`.
+- The Supabase Storage bucket used for avatars should be public if the frontend displays the stored URL directly.
 - Supabase stores the persistent app data. Render only runs the backend API.
 - Vercel only serves the frontend and calls the Render API through `VITE_API_BASE_URL`.

@@ -4,7 +4,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
@@ -15,23 +14,64 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/tarot', express.static(path.join(__dirname, '../public/tarot')));
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads');
-
-        if (!fs.existsSync(uploadDir)) {fs.mkdirSync(uploadDir, { recursive: true });}
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Add a timestamp suffix to avoid filename collisions.
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('只允許上傳圖片檔案'));
+        }
+        cb(null, true);
     }
 });
-const upload = multer({ storage: storage });
+
+const avatarUpload = (req, res, next) => {
+    upload.single('avatar')(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({ error: error.message || '頭像上傳格式不正確' });
+        }
+        next();
+    });
+};
+
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'avatars';
+
+function getSupabaseStorageConfig() {
+    const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+        throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    return { supabaseUrl, serviceRoleKey };
+}
+
+function encodeStoragePath(storagePath) {
+    return storagePath.split('/').map(encodeURIComponent).join('/');
+}
+
+async function uploadAvatarToSupabase(userId, file) {
+    const { supabaseUrl, serviceRoleKey } = getSupabaseStorageConfig();
+    const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+    const safeExt = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
+    const objectPath = `users/${userId}/avatar-${Date.now()}-${Math.round(Math.random() * 1E9)}${safeExt}`;
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${SUPABASE_STORAGE_BUCKET}/${encodeStoragePath(objectPath)}`;
+
+    await axios.post(uploadUrl, file.buffer, {
+        headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            'Content-Type': file.mimetype || 'application/octet-stream',
+            'x-upsert': 'true'
+        },
+        maxBodyLength: Infinity
+    });
+
+    return `${supabaseUrl}/storage/v1/object/public/${SUPABASE_STORAGE_BUCKET}/${encodeStoragePath(objectPath)}`;
+}
 
 const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
@@ -107,18 +147,19 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
     res.json(user);
     } catch (error) {res.status(500).json({ error: '讀取使用者資料失敗' });}});
 
-app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+app.post('/api/user/avatar', authenticateToken, avatarUpload, async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Please choose an image file to upload' });
 
-  // Store a relative path so frontend can attach the correct API host.
-    const avatarUrl = `/uploads/${req.file.filename}`;
-
     try {
+        const avatarUrl = await uploadAvatarToSupabase(req.user.userId, req.file);
         await prisma.user.update({
             where: { id: req.user.userId },
             data: { avatarUrl }});
         res.json({ message: '頭像上傳成功', avatarUrl });
-    } catch (error) {res.status(500).json({ error: '頭像上傳失敗' });}});
+    } catch (error) {
+        console.error('Avatar upload failed:', error.response?.data || error.message);
+        res.status(500).json({ error: '頭像上傳失敗' });
+    }});
 
 app.put('/api/user/profile/update', authenticateToken, async (req, res) => {
     const { username, bio} = req.body;
