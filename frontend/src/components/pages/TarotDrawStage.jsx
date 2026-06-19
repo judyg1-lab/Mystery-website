@@ -175,15 +175,19 @@ export default function TarotDrawStage({
   const pickingIndexRef = useRef(null);
   const [stageMode, setStageMode] = useState('choosing');
   const [flippedCards, setFlippedCards] = useState({});
+  const [settledReveals, setSettledReveals] = useState({});
   const [guideIndex, setGuideIndex] = useState(0);
   const [hoveredArcIndex, setHoveredArcIndex] = useState(null);
   const slots = useMemo(() => getSpreadSlots(spread, true), [spread]);
   const nextSlot = slots[selectedDraws.length];
   const selectionComplete = selectedDraws.length >= slots.length;
+  const isSoulMasterRite = spread?.key === 'soul_master';
+  const shouldShowMasterCard = Boolean(soulMaster) && (!isSoulMasterRite || Boolean(settledReveals[0]));
 
   useEffect(() => {
     setStageMode('choosing');
     setFlippedCards({});
+    setSettledReveals({});
     setGuideIndex(0);
     setHoveredArcIndex(null);
     pickingIndexRef.current = null;
@@ -331,6 +335,9 @@ export default function TarotDrawStage({
     if (stageMode !== 'reveal' || index !== guideIndex || flippedCards[index]) return;
 
     setFlippedCards((cards) => ({ ...cards, [index]: true }));
+    window.setTimeout(() => {
+      setSettledReveals((cards) => ({ ...cards, [index]: true }));
+    }, 580);
 
     if (index >= selectedDraws.length - 1) {
       window.setTimeout(() => {
@@ -394,15 +401,23 @@ export default function TarotDrawStage({
         <span>{spread.name}</span>
       </div>
 
-      <div className="draw-master-card" style={drawMasterCard}>
-        <img
-          src={soulMaster ? getAssetUrl(getMasterCardImagePath(soulMaster)) : cardBackUrl}
-          alt={soulMaster || 'Master Card'}
-          style={drawMasterImage}
-        />
-        <span style={drawMasterLabel}>MASTER CARD</span>
-        <strong style={drawMasterName}>{soulMaster || '未抽取主牌'}</strong>
-      </div>
+      {shouldShowMasterCard && (
+        <motion.div
+          className="draw-master-card"
+          style={drawMasterCard}
+          initial={{ opacity: 0, y: -12, scale: 0.92, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+          transition={{ duration: 0.34, ease: 'easeOut' }}
+        >
+          <img
+            src={getAssetUrl(getMasterCardImagePath(soulMaster))}
+            alt={soulMaster}
+            style={drawMasterImage}
+          />
+          <span style={drawMasterLabel}>MASTER CARD</span>
+          <strong style={drawMasterName}>{soulMaster}</strong>
+        </motion.div>
+      )}
 
       {(stageMode === 'choosing' || stageMode === 'gathering') && (
         <div
