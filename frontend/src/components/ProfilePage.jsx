@@ -160,7 +160,7 @@ export default function ProfilePage() {
     const fetchLatestProfile = async () => {
       try {
         const token = localStorage.getItem('mystic_token');
-        const res = await fetch("http://localhost:5000/api/user/profile", {
+        const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
           headers: { Authorization: `Bearer ${token}` }});
         const data = await res.json();
         if (res.ok) {
@@ -229,7 +229,7 @@ export default function ProfilePage() {
     const token = localStorage.getItem("mystic_token");
 
     try {
-      const res = await fetch("http://localhost:5000/api/user/avatar", {
+      const res = await fetch(`${API_BASE_URL}/api/user/avatar`, {
         method: "POST",
         headers: {Authorization: `Bearer ${token}`},// 不要手動加 Content-Type，瀏覽器會自己加
         body: formData
@@ -274,7 +274,7 @@ export default function ProfilePage() {
   const executeSaveOverview = async () => {
     try {
       const token = localStorage.getItem("mystic_token");
-      const res = await fetch("http://localhost:5000/api/user/profile/update", {
+      const res = await fetch(`${API_BASE_URL}/api/user/profile/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -351,7 +351,7 @@ export default function ProfilePage() {
   const executeChangePassword = async () => {
     try {
       const token = localStorage.getItem("mystic_token");
-      const res = await fetch("http://localhost:5000/api/user/change-password", {
+      const res = await fetch(`${API_BASE_URL}/api/user/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -407,7 +407,7 @@ export default function ProfilePage() {
   const executePermanentDelete = async () => {
     try {
       const token = localStorage.getItem("mystic_token");
-      const res = await fetch("http://localhost:5000/api/user/delete", {
+      const res = await fetch(`${API_BASE_URL}/api/user/delete`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }});
 
@@ -448,7 +448,7 @@ export default function ProfilePage() {
     const fetchFavorites = async () => {
       try {
         const token = localStorage.getItem('mystic_token');
-        const res = await fetch("http://localhost:5000/api/user/favorites", {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -464,7 +464,7 @@ export default function ProfilePage() {
     try {
         const token = localStorage.getItem('mystic_token');
 
-        const res = await fetch(`http://localhost:5000/api/user/favorites/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites/${id}`, {
           method: 'DELETE',
           headers: {Authorization: `Bearer ${token}`}
         });

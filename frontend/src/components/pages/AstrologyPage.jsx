@@ -9,6 +9,7 @@ import BackBtn from '../backBtn';
 import MysticModal from '../MysticModal';
 import MysticChartTool from '../MysticChartTool';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 class StarDust {
   constructor(canvasWidth) {
@@ -113,7 +114,7 @@ export default function AstrologyPage() {
     if (!['origins', 'codex'].includes(activeTab)) return;
     const fetchRealArticles = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/astrology/articles?tabType=${activeTab}`);
+        const res = await fetch(`${API_BASE_URL}/api/astrology/articles?tabType=${activeTab}`);
         const data = await res.json();
         if (res.ok) { setArticles(data); }
       } catch (err) {
@@ -169,7 +170,7 @@ export default function AstrologyPage() {
   const fetchUserFavorites = useCallback(async () => {
     try {
       const token = localStorage.getItem('mystic_token');
-      const res = await fetch("http://localhost:5000/api/user/favorites", {
+      const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -186,7 +187,7 @@ export default function AstrologyPage() {
   const fetchHistoryLogs = useCallback(async () => {
     try {
       const token = localStorage.getItem('mystic_token');
-      const res = await fetch('http://localhost:5000/api/history/astrology', {
+      const res = await fetch(`${API_BASE_URL}/api/history/astrology`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -249,7 +250,7 @@ export default function AstrologyPage() {
       const targetFav = dbFavorites.find(fav => fav.articleId == item.id);
       if (!targetFav) return;
       try {
-        const res = await fetch(`http://localhost:5000/api/user/favorites/${targetFav.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites/${targetFav.id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -261,7 +262,7 @@ export default function AstrologyPage() {
       } catch (err) { console.error(err); }
     } else {
       try {
-        const res = await fetch("http://localhost:5000/api/user/favorites", {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ articleId: item.id })
@@ -284,7 +285,7 @@ export default function AstrologyPage() {
     if (rec.isFavorite) {
       if (!rec.favoriteId) return;
       try {
-        const res = await fetch(`http://localhost:5000/api/user/favorites/${rec.favoriteId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites/${rec.favoriteId}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -295,7 +296,7 @@ export default function AstrologyPage() {
       } catch (err) { console.error(err); }
     } else {
       try {
-        const res = await fetch("http://localhost:5000/api/user/favorites", {
+        const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ historyId: rec.id })
@@ -317,7 +318,7 @@ export default function AstrologyPage() {
   const nextTitle = renameDraft.trim();
   if (!nextTitle || nextTitle === rec.title) { closeMysticModal(); return; }
   try {
-    const res = await fetch(`http://localhost:5000/api/history/astrology/${rec.id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/history/astrology/${rec.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ title: nextTitle.trim() })
@@ -344,7 +345,7 @@ const executeDeleteHistory = async (rec) => {
   const token = localStorage.getItem('mystic_token');
   if (!token) return;
   try {
-    const res = await fetch(`http://localhost:5000/api/history/astrology/${rec.id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/history/astrology/${rec.id}`, {
       method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {

@@ -8,6 +8,7 @@ import MysticModal from '../MysticModal';
 import MysticChartTool from '../MysticChartTool';
 
 const ACCENT = '#00ccff';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const hoverGold = 'rgba(0,204,255,0.08)';
 const borderGold = '1px solid rgba(0,204,255,0.2)';
 
@@ -99,7 +100,7 @@ export default function ZiWeiPage() {
 
     const fetchArticles = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/ziwei/articles?tabType=${activeTab}`);
+        const res = await fetch(`${API_BASE_URL}/api/ziwei/articles?tabType=${activeTab}`);
         const data = await res.json();
         if (res.ok) setArticles(data);
       } catch (err) {
@@ -152,7 +153,7 @@ export default function ZiWeiPage() {
   const fetchUserFavorites = useCallback(async () => {
     try {
       const token = localStorage.getItem('mystic_token');
-      const res = await fetch('http://localhost:5000/api/user/favorites', {
+      const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -169,7 +170,7 @@ export default function ZiWeiPage() {
   const fetchHistoryLogs = useCallback(async () => {
     try {
       const token = localStorage.getItem('mystic_token');
-      const res = await fetch('http://localhost:5000/api/history/ziwei', {
+      const res = await fetch(`${API_BASE_URL}/api/history/ziwei`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -230,7 +231,7 @@ export default function ZiWeiPage() {
       const targetFav = dbFavorites.find(fav => fav.articleId == item.id);
       if (!targetFav) return;
 
-      const res = await fetch(`http://localhost:5000/api/user/favorites/${targetFav.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/favorites/${targetFav.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -238,7 +239,7 @@ export default function ZiWeiPage() {
       return;
     }
 
-    const res = await fetch('http://localhost:5000/api/user/favorites', {
+    const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ articleId: item.id })
@@ -257,7 +258,7 @@ export default function ZiWeiPage() {
     if (rec.isFavorite) {
       if (!rec.favoriteId) return;
 
-      const res = await fetch(`http://localhost:5000/api/user/favorites/${rec.favoriteId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/user/favorites/${rec.favoriteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -268,7 +269,7 @@ export default function ZiWeiPage() {
       return;
     }
 
-    const res = await fetch('http://localhost:5000/api/user/favorites', {
+    const res = await fetch(`${API_BASE_URL}/api/user/favorites`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ historyId: rec.id })

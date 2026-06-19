@@ -5,6 +5,8 @@ import { Mail, Lock, User, Phone, CheckCircle, ArrowRight, ArrowLeft, RefreshCw,
 import BackBtn from './backBtn';
 import MysticModal from './MysticModal';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const COLORS = {
   gold: '#d4af37',
   accentBlue: '#4fb8d6',
@@ -94,7 +96,7 @@ export default function LoginPage() {
       return;
     }
     try{
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username: formData.username, password: formData.password, rememberMe: formData.rememberMe})});
@@ -151,7 +153,7 @@ export default function LoginPage() {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username,email,phone,password})});
