@@ -210,11 +210,47 @@ export default function LoginPage() {
           transition: background-color 5000s ease-in-out 0s;
         }
         input[type="checkbox"] {
+          appearance: none;
+          -webkit-appearance: none;
           cursor: pointer;
           width: 18px;
           height: 18px;
-          accent-color: #d4af37;
           flex-shrink: 0;
+          display: grid;
+          place-items: center;
+          margin: 0;
+          border: 1px solid rgba(212, 175, 55, 0.5);
+          border-radius: 5px;
+          background: rgba(255, 255, 255, 0.025);
+          backdrop-filter: blur(10px);
+          box-shadow:
+            inset 0 0 10px rgba(255, 255, 255, 0.035),
+            0 0 14px rgba(212, 175, 55, 0.08);
+          transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+        }
+        input[type="checkbox"]::after {
+          content: "";
+          width: 8px;
+          height: 5px;
+          border-left: 2px solid #f7df9b;
+          border-bottom: 2px solid #f7df9b;
+          transform: rotate(-45deg) scale(0);
+          transform-origin: center;
+          transition: transform 140ms ease;
+        }
+        input[type="checkbox"]:checked {
+          border-color: rgba(212, 175, 55, 0.9);
+          background: rgba(212, 175, 55, 0.08);
+          box-shadow:
+            inset 0 0 12px rgba(212, 175, 55, 0.08),
+            0 0 18px rgba(212, 175, 55, 0.18);
+        }
+        input[type="checkbox"]:checked::after {
+          transform: rotate(-45deg) scale(1);
+        }
+        input[type="checkbox"]:focus-visible {
+          outline: 2px solid rgba(212, 175, 55, 0.45);
+          outline-offset: 3px;
         }
       `}</style>
 
