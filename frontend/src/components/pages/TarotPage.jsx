@@ -220,11 +220,15 @@ const CHINESE_CARD_MEANINGS = {
 
 const getChineseSubtitle = (value = '') => CHINESE_SUBTITLES[value] || value;
 
-const getChineseCardMeaning = (card = {}, fallback = '') => {
-  const title = card.card?.title || card.name || '';
-  const rawMeaning = card.meaning || '';
+const getChineseCardMeaning = (card, fallback = '') => {
+  const safeCard = card || {};
+
+  const title = safeCard.card?.title || safeCard.name || '';
+  const rawMeaning = safeCard.meaning || '';
+
   if (CHINESE_CARD_MEANINGS[title]) return CHINESE_CARD_MEANINGS[title];
   if (!rawMeaning || isEnglishText(rawMeaning)) return fallback;
+
   return rawMeaning;
 };
 
@@ -422,49 +426,78 @@ function TarotHistoryReport({ record, reading, cards, onCardOpen, onCopyPrompt, 
 
 // ─── TarotCardDetailOverlay ──────────────────────────────────────────────────
 const TarotCardDetailOverlay = ({ entry, onClose }) => {
+  if (!entry) return null;
+
   const title = entry?.card?.title || entry?.name || 'THOTH ARCANA';
-  const imageUrl = entry?.card?.imageUrl ? getAssetUrl(entry.card.imageUrl) : TAROT_CARD_BACK_URL;
-  const meaningLines = formatTarotMeaningLines(getChineseCardMeaning(entry, entry?.meaning || ''));
+
+  const imageUrl =
+    entry?.card?.imageUrl
+      ? getAssetUrl(entry.card.imageUrl)
+      : entry?.imageUrl
+        ? getAssetUrl(entry.imageUrl)
+        : TAROT_CARD_BACK_URL;
+
+  const meaningLines = formatTarotMeaningLines(
+    getChineseCardMeaning(entry, entry?.meaning || '')
+  );
 
   return (
     <AnimatePresence>
-      {entry && (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={tarotDetailOverlay}
+        onClick={onClose}
+      >
         <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          style={tarotDetailOverlay}
-          onClick={onClose}
+          initial={{ opacity: 0, y: 22, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 18, scale: 0.96 }}
+          transition={{ duration: 0.32 }}
+          style={tarotDetailFloatingContent}
+          onClick={(e) => e.stopPropagation()}
         >
-          <motion.article
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.96 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            style={tarotDetailPanel}
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={onClose}
+            style={tarotDetailCloseMinimal}
           >
-            <motion.button
-              type="button"
-              style={tarotDetailClose}
-              onClick={onClose}
-              aria-label="關閉"
-              whileHover={{ scale: 1.12, borderColor: 'rgba(188,19,254,0.72)', boxShadow: '0 0 24px rgba(188,19,254,0.42)' }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ duration: 0.18 }}
-            >
-              ×
-            </motion.button>
-            <div style={tarotDetailImageStage}>
-              <img src={imageUrl} alt={title} style={tarotDetailImage}
-                onError={(e) => { e.currentTarget.src = TAROT_CARD_BACK_URL; }} />
+            ×
+          </button>
+
+          <img
+            src={imageUrl}
+            alt={title}
+            style={tarotDetailFloatingImage}
+            onError={(e) => {
+              e.currentTarget.src = TAROT_CARD_BACK_URL;
+            }}
+          />
+
+          <div style={tarotDetailTextBlock}>
+            <div style={tarotDetailKicker}>
+              {entry?.orbit || 'THOTH ARCANA'}
             </div>
-            <div style={tarotDetailMeaningScroll}>
-              {meaningLines.length > 0
-                ? meaningLines.map((line, i) => <p key={i} style={tarotDetailMeaningLine}>{line}</p>)
-                : <p style={tarotDetailMeaningLine}>這張牌的秘典說明尚未載入。</p>}
+
+            <h2 style={tarotDetailTitle}>{title}</h2>
+
+            <div style={tarotDetailMeaning}>
+              {meaningLines.length > 0 ? (
+                meaningLines.map((line, index) => (
+                  <p key={index} style={tarotDetailMeaningLine}>
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p style={tarotDetailMeaningLine}>
+                  這張牌目前沒有完整牌義資料。
+                </p>
+              )}
             </div>
-          </motion.article>
+          </div>
         </motion.div>
-      )}
+      </motion.div>
     </AnimatePresence>
   );
 };
@@ -1425,13 +1458,95 @@ const entryOrbit = { color: '#d4af37', fontSize: '0.76rem', letterSpacing: '1px'
 const entryMeaning = { color: 'rgba(255,255,255,0.72)', fontFamily: 'Inter, sans-serif', fontSize: '0.92rem', lineHeight: 1.75, margin: 0, display: 'grid', gap: '6px' };
 const entryMeaningLine = { display: 'block' };
 
-const tarotDetailOverlay = { position: 'fixed', inset: 0, zIndex: 10000, display: 'grid', placeItems: 'center', padding: '24px', background: 'radial-gradient(circle at 50% 44%, rgba(188,19,254,0.16), rgba(5,2,8,0.82) 42%, rgba(5,2,8,0.94))', backdropFilter: 'blur(10px)' };
+const tarotDetailOverlay = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 999,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '28px',
+  boxSizing: 'border-box',
+  background: 'rgba(5, 2, 10, 0.62)',
+  backdropFilter: 'blur(12px)',
+};
+const tarotDetailFloatingContent = {
+  position: 'relative',
+  width: 'min(520px, 92vw)',
+  maxHeight: '88vh',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  marginTop: '80px',
+};
+const tarotDetailCloseMinimal = {
+  position: 'absolute',
+  top: '-10px',
+  right: '65px',
+  width: '34px',
+  height: '34px',
+  border: 'none',
+  background: 'transparent',
+  color: 'rgba(255,255,255,0.72)',
+  fontSize: '2rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  textShadow: '0 0 12px rgba(188,19,254,0.65)',
+};
+const tarotDetailFloatingImage = {
+  width: 'clamp(220px, 26vw, 260px)',
+  height: 'auto',
+  maxHeight: '55vh',
+  objectFit: 'contain',
+  borderRadius: '8px',
+  boxShadow:
+    '0 28px 70px rgba(0,0,0,0.78), 0 0 42px rgba(188,19,254,0.48), 0 0 86px rgba(188,19,254,0.22)',
+};
+const tarotDetailTextBlock = {
+  marginTop: '12px',
+  width: '100%',
+  maxWidth: '520px',
+  padding: '0 10px',
+  boxSizing: 'border-box',
+};
 const tarotDetailPanel = { position: 'relative', width: 'min(720px, 92vw)', maxHeight: 'min(900px, 92vh)', overflow: 'visible', borderRadius: 0, padding: '10px 0 0', border: 'none', background: 'transparent', boxShadow: 'none' };
-const tarotDetailClose = { position: 'absolute', right: 'clamp(4px, 5vw, 64px)', top: '2px', width: '36px', height: '36px', borderRadius: '50%', border: '1px solid rgba(212,175,55,0.34)', background: 'rgba(24,8,32,0.86)', color: '#f4d27c', cursor: 'pointer', fontSize: '1.35rem', lineHeight: 1, boxShadow: '0 0 20px rgba(188,19,254,0.18)' };
+const tarotDetailClose = {
+  position: 'absolute',
+  top: '14px',
+  right: '16px',
+  width: '34px',
+  height: '34px',
+  borderRadius: '50%',
+  border: '1px solid rgba(255,255,255,0.18)',
+  background: 'rgba(255,255,255,0.06)',
+  color: 'rgba(255,255,255,0.82)',
+  fontSize: '1.4rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+};
 const tarotDetailImageStage = { display: 'grid', placeItems: 'center', margin: '0 auto 18px', padding: 0, background: 'transparent' };
-const tarotDetailImage = { width: 'clamp(300px, 30vw, 430px)', height: 'auto', maxHeight: 'min(620px, 66vh)', objectFit: 'contain', display: 'block', border: 'none', background: 'transparent', boxShadow: 'none', filter: 'drop-shadow(0 24px 46px rgba(0,0,0,0.58))' };
-const tarotDetailMeaningScroll = { width: 'min(680px, 90vw)', maxHeight: 'min(240px, 26vh)', overflowY: 'auto', margin: '0 auto', padding: '18px 22px', border: 'none', borderRadius: '8px', background: 'linear-gradient(180deg, rgba(5,2,8,0.62), rgba(5,2,8,0.42))', boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 0 22px rgba(188,19,254,0.055)' };
-const tarotDetailMeaningLine = { margin: '0 0 12px', color: 'rgba(255,255,255,0.78)', fontFamily: 'Inter, sans-serif', fontSize: '1rem', lineHeight: 1.9, letterSpacing: '0.6px', textAlign: 'center' };
+const tarotDetailImage = {
+  width: '210px',
+  height: '350px',
+  objectFit: 'cover',
+  objectPosition: 'center top',
+  borderRadius: '10px',
+  border: '1px solid rgba(212,175,55,0.36)',
+  boxShadow:
+    '0 22px 48px rgba(0,0,0,0.62), 0 0 26px rgba(188,19,254,0.28)',
+};
+
+const tarotDetailMeaningLine = {
+  margin: '0 0 10px',
+  color: 'rgba(255,255,255,0.82)',
+  fontFamily: "'Noto Serif TC', serif",
+  fontSize: '0.9rem',
+  lineHeight: 1.85,
+  letterSpacing: '0.04em',
+  textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+};
 
 const detailText = { fontSize: '1rem', lineHeight: '1.9', color: 'rgba(255,255,255,0.78)', margin: 0, fontFamily: 'Inter, sans-serif' };
 const sidebarHeader = { padding: '0 10px 20px', fontFamily: 'Cinzel', letterSpacing: '4px', color: '#d4af37', fontSize: '0.8rem' };
@@ -1454,6 +1569,77 @@ const archiveFirstParagraph = { ...archiveParagraph, fontSize: '1.08rem', color:
 const dropCap = { float: 'left', fontFamily: '"Noto Serif TC", "Cinzel", serif', fontSize: '3.2rem', lineHeight: '0.9', padding: '8px 14px 4px 0', color: '#d4af37', textShadow: '0 0 16px rgba(188,19,254,0.35)' };
 const ornamentLine = { height: '1px', background: 'linear-gradient(90deg, transparent, rgba(188,19,254,0.8), rgba(212,175,55,0.35))' };
 const ornamentStar = { fontStyle: 'normal', color: '#bc13fe', textShadow: '0 0 12px rgba(188,19,254,0.75)', fontSize: '0.9rem' };
+
+const tarotDetailCard = {
+  position: 'relative',
+  width: 'min(760px, 92vw)',
+  minHeight: '420px',
+  display: 'grid',
+  gridTemplateColumns: '240px 1fr',
+  gap: '28px',
+  padding: '30px',
+  borderRadius: '14px',
+  border: '1px solid rgba(188,19,254,0.36)',
+  background:
+    'linear-gradient(135deg, rgba(12,4,22,0.96), rgba(30,8,48,0.94), rgba(5,2,10,0.98))',
+  boxShadow:
+    '0 30px 80px rgba(0,0,0,0.72), 0 0 38px rgba(188,19,254,0.24), inset 0 1px 0 rgba(255,255,255,0.08)',
+};
+
+
+const tarotDetailImageFrame = {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const tarotDetailInfo = {
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+};
+
+const tarotDetailKicker = {
+  color: '#bc13fe',
+  fontFamily: "'Noto Serif TC', serif",
+  fontSize: '0.78rem',
+  letterSpacing: '0.16em',
+  marginBottom: '8px',
+  textShadow: '0 0 12px rgba(188,19,254,0.55)',
+};
+
+const tarotDetailTitle = {
+  margin: '0 0 14px',
+  color: '#f5ead8',
+  fontFamily: "'Cinzel', serif",
+  fontSize: 'clamp(1.45rem, 3vw, 2.2rem)',
+  letterSpacing: '0.08em',
+  textShadow: '0 0 18px rgba(212,175,55,0.24)',
+};
+
+const tarotDetailDivider = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  margin: '16px 0 18px',
+  color: '#d4af37',
+};
+
+const tarotDetailDividerSpan = {};
+
+const tarotDetailMeaning = {
+  maxHeight: '24vh',
+  overflowY: 'auto',
+  padding: '0 8px',
+};
+
+const tarotDetailDividerLine = {
+  flex: 1,
+  height: '1px',
+  background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.52), transparent)',
+};
 
 const hideScrollbarCSS = `
   *::-webkit-scrollbar { width: 6px; height: 6px; }
