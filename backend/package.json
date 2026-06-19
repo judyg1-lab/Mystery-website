@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "seed:if-empty": "node src/seedIfEmpty.js",
+    "seed:all": "npm run seed:articles && npm run seed:tarot-cards",
+    "seed:articles": "node src/seedMysticArticles.js",
     "seed:tarot-cards": "node src/seedTarotCards.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

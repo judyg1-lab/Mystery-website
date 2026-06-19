@@ -28,6 +28,24 @@
 - npm install html2canvas: 讓「匯出」按鈕真的能把畫面變成 JPEG 圖片下載
 - npm install react-icons
 
+### backend data seed
+
+- `npm run seed:all`: seed mystic articles and tarot cards.
+- `npm run seed:if-empty`: seed only when the article or tarot-card tables are empty.
+- `npm run seed:articles`: seed the four mystic-system article pages.
+- `npm run seed:tarot-cards`: seed tarot cards and tarot codex articles.
+- Run seed commands only when the target database needs initial data.
+- The seed scripts use Prisma `upsert`, so rerunning them updates existing rows instead of creating duplicates.
+
+### Render backend deploy
+
+If Render's root directory is `backend`:
+
+- Build Command: `npm install && npx prisma generate && npx prisma migrate deploy && npm run seed:if-empty`
+- Start Command: `npm start`
+
+The build command can run on every deploy. `seed:if-empty` checks the database first and skips seed work when data already exists.
+
 ### tech stack
 - frontend: React.js, Next.js
 - backend: Python(Flask o rFastAPI)->why not use Node.js?+ MongoDB or PostgreSQL
