@@ -328,7 +328,7 @@ export default function LoginPage() {
             <h1 style={{...mainTitleStyle, fontSize: '2rem', marginBottom: '20px'}}>REGISTER</h1>
 
             <div style={{...formGroupStyle, gap: '10px'}}>
-              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="帳號，例如 judy123 或 judy_lab" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="帳號，例如 xxx123 或 xxx_lab" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="電子郵件" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="電話號碼" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 12 碼，含大小寫、數字、符號" style={inputStyle}/></div>
