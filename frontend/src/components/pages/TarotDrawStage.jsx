@@ -342,14 +342,14 @@ export default function TarotDrawStage({
     if (index >= selectedDraws.length - 1) {
       window.setTimeout(() => {
         onRevealComplete?.();
-      }, 820);
+      }, isSoulMasterRite ? 2800 : 820);
       return;
     }
 
     window.setTimeout(() => {
       setGuideIndex(index + 1);
     }, 420);
-  }, [flippedCards, guideIndex, onRevealComplete, selectedDraws.length, stageMode]);
+  }, [flippedCards, guideIndex, isSoulMasterRite, onRevealComplete, selectedDraws.length, stageMode]);
 
   const handleArcPointerMove = useCallback((event) => {
     if (stageMode !== 'choosing' || isCompleting || selectionComplete) {
