@@ -19,41 +19,23 @@ const TOKEN_TTL_MS = {
   session: 2 * 60 * 60 * 1000
 };
 
-const COMMON_PASSWORDS = new Set([
-  'password', 'password123', '123456', '12345678', '123456789', 'qwerty', 'qwerty123',
-  'admin123', 'letmein', 'welcome', 'iloveyou', 'abc123', '111111', '000000', 'mystic123'
-]);
 const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
+const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+const PHONE_PATTERN = /^09\d{8}$/;
 
 function evaluatePassword(password) {
-  const lower = password.toLowerCase();
-  const checks = [
-    password.length >= 8,
-    /[A-Z]/.test(password),
-    /[a-z]/.test(password),
-    /\d/.test(password),
-    /[^A-Za-z0-9]/.test(password)
-  ];
-  if (COMMON_PASSWORDS.has(lower) || /^\d+$/.test(password) || /^(.)\1+$/.test(password)) {
-    return { ok: false, label: '太常見', message: '這組密碼太常見或太容易被猜到，請換一組。' };
+  if (!PASSWORD_PATTERN.test(password)) {
+    return { ok: false, label: '格式錯誤', message: '密碼至少 6 碼，並且需包含英文字母與數字；符號可自由加入。' };
   }
-  if (/(.)\1{3,}/.test(password)) {
-    return { ok: false, label: '重複過多', message: '密碼不可以使用大量重複字元。' };
-  }
-  if (checks.filter(Boolean).length < 5) {
-    return { ok: false, label: '強度不足', message: '密碼至少 8 碼，並包含大小寫英文、數字與符號。' };
-  }
-  return { ok: true, label: '強度良好', message: '密碼強度良好。' };
+  return { ok: true, label: '格式正確', message: '密碼格式正確。' };
 }
 
 function generateStrongPassword() {
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const letters = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
   const numbers = '23456789';
-  const symbols = '!@#$%^&*?';
-  const all = upper + lower + numbers + symbols;
+  const optional = letters + numbers + '!@#$%^&*?';
   const pick = (source) => source[Math.floor(Math.random() * source.length)];
-  return [pick(upper), pick(lower), pick(numbers), pick(symbols), ...Array.from({ length: 12 }, () => pick(all))]
+  return [pick(letters), pick(numbers), ...Array.from({ length: 6 }, () => pick(optional))]
     .sort(() => Math.random() - 0.5)
     .join('');
 }
@@ -63,6 +45,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState('login');
   const [resetMethod, setResetMethod] = useState('email');
   const [showPassword, setShowPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '', email: '', phone: '', password: '', confirmPassword: '', rememberMe: false
   });
@@ -120,7 +104,7 @@ export default function LoginPage() {
   const fillGeneratedPassword = () => {
     const password = generateStrongPassword();
     setFormData(prev => ({ ...prev, password, confirmPassword: password }));
-    showModal({ title: '已產生安全密碼', message: '系統已為你填入一組高強度密碼。請妥善保存，之後登入會需要用到。' });
+    showModal({ title: '已產生安全密碼', message: '系統已為你填入一組包含英文字母與數字的密碼。請妥善保存，之後登入會需要用到。' });
   };
 
   const handleGoogleRegister = () => {
@@ -145,6 +129,10 @@ export default function LoginPage() {
       showModal({ title: 'Email 格式錯誤', message: '請輸入有效的 Email。', type: 'danger' });
       return;
     }
+    if (!PHONE_PATTERN.test(phone.trim())) {
+      showModal({ title: '手機號碼格式錯誤', message: '請輸入 10 位手機號碼，例如 0912345678。', type: 'danger' });
+      return;
+    }
     const passwordCheck = evaluatePassword(password);
     if (!passwordCheck.ok) {
       showModal({ title: `密碼${passwordCheck.label}`, message: passwordCheck.message, type: 'danger' });
@@ -158,7 +146,7 @@ export default function LoginPage() {
       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username: normalizedUsername,email,phone,password})});
+        body: JSON.stringify({username: normalizedUsername,email,phone: phone.trim(),password})});
 
       const data = await response.json();
       if (response.ok) {
@@ -330,11 +318,34 @@ export default function LoginPage() {
             <div style={{...formGroupStyle, gap: '10px'}}>
               <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="帳號，例如 xxx123 或 xxx_lab" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="電子郵件" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="電話號碼" style={inputStyle}/></div>
-              <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 8 碼，含大小寫、數字、符號" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="手機號碼，例如 0912345678" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}>
+                <Lock size={12} style={iconStyle}/>
+                <input
+                  name="password"
+                  type={showRegisterPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="至少 6 碼，需含英文與數字"
+                  style={{...inputStyle, paddingRight: '40px'}}
+                />
+                <span onClick={() => setShowRegisterPassword(!showRegisterPassword)} style={eyeIconStyle}>
+                  {showRegisterPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </span>
+              </div>
               <div style={inputWrapperStyle}>
                 <CheckCircle size={12} style={{...iconStyle, color: formData.password && formData.password === formData.confirmPassword ? '#00ffaa' : COLORS.textGray }}/>
-                <input name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} placeholder="再次輸入密碼" style={inputStyle}/>
+                <input
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="再次輸入密碼"
+                  style={{...inputStyle, paddingRight: '40px'}}
+                />
+                <span onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={eyeIconStyle}>
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </span>
               </div>
               <button type="button" onClick={fillGeneratedPassword} style={secondaryBtnStyle}>產生安全密碼</button>
               <button type="button" onClick={handleGoogleRegister} style={googleBtnStyle}>

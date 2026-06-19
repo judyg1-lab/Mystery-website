@@ -598,8 +598,8 @@ const baseBack = (cardBackUrl) => ({
 
 const fanCardBack = (cardBackUrl, arcCardCount = ARC_CARD_COUNT) => ({
   ...baseBack(cardBackUrl),
-  width: arcCardCount <= 22 ? '38px' : '28px',
-  height: arcCardCount <= 22 ? '66px' : '50px',
+  width: arcCardCount <= 22 ? '41px' : '30px',
+  height: arcCardCount <= 22 ? '71px' : '54px',
   borderColor: 'rgba(235,238,244,0.18)',
   boxShadow: '0 6px 14px rgba(0,0,0,0.42)'
 });
