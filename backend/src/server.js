@@ -37,6 +37,7 @@ const COMMON_PASSWORDS = new Set([
     'password', 'password123', '123456', '12345678', '123456789', 'qwerty', 'qwerty123',
     'admin123', 'letmein', 'welcome', 'iloveyou', 'abc123', '111111', '000000', 'mystic123'
 ]);
+const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
 
 function validatePasswordStrength(password = '') {
     const lower = password.toLowerCase();
@@ -75,13 +76,17 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/auth/register', async (req, res) => {
     const { username, email, phone, password } = req.body;
     try {
+        const normalizedUsername = String(username || '').trim();
+        if (!USERNAME_PATTERN.test(normalizedUsername)) {
+            return res.status(400).json({ error: '帳號需以英文字母開頭，僅可使用英文字母、數字、底線或短橫，長度 3-40 字。' });
+        }
         const passwordError = validatePasswordStrength(password || '');
         if (passwordError) return res.status(400).json({ error: passwordError });
-        const existingUser = await prisma.user.findFirst({where: { OR: [{ email }, { username }, { phone }] }});
+        const existingUser = await prisma.user.findFirst({where: { OR: [{ email }, { username: normalizedUsername }, { phone }] }});
         if (existingUser) return res.status(400).json({ error: '帳號、Email 或電話已被註冊' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await prisma.user.create({data: { username, email, phone, password: hashedPassword }});
+        const newUser = await prisma.user.create({data: { username: normalizedUsername, email, phone, password: hashedPassword }});
         res.status(201).json({ message: '註冊成功，請重新登入。', userId: newUser.id });
     } catch (error) {
         res.status(500).json({ error: '註冊失敗' });

@@ -23,6 +23,7 @@ const COMMON_PASSWORDS = new Set([
   'password', 'password123', '123456', '12345678', '123456789', 'qwerty', 'qwerty123',
   'admin123', 'letmein', 'welcome', 'iloveyou', 'abc123', '111111', '000000', 'mystic123'
 ]);
+const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{2,39}$/;
 
 function evaluatePassword(password) {
   const lower = password.toLowerCase();
@@ -125,18 +126,19 @@ export default function LoginPage() {
   const handleGoogleRegister = () => {
     showModal({
       title: 'Google 註冊尚未啟用',
-      message: '要真的使用 Gmail/Google 註冊，需要先設定 Google OAuth Client ID、Client Secret 與回呼網址，並在資料庫新增 Google 帳號識別欄位。'
+      message: '敬請等待'
     });
   };
 
   const handleRegister = async() => {
     const { username, email, phone, password, confirmPassword } = formData;
+    const normalizedUsername = username.trim();
     if (!username || !email || !phone || !password) {
       showModal({ title: '註冊資料不足', message: '請填寫使用者名稱、Email、電話與密碼。', type: 'danger' });
       return;
     }
-    if (!/^[\p{L}][\p{L}\s.'-]{1,39}$/u.test(username.trim())) {
-      showModal({ title: '使用者名稱格式錯誤', message: '姓名或使用者名稱需以文字為主，不能只用數字或符號帶過。', type: 'danger' });
+    if (!USERNAME_PATTERN.test(normalizedUsername)) {
+      showModal({ title: '帳號格式錯誤', message: '帳號需以英文字母開頭，僅可使用英文字母、數字、底線或短橫，長度 3-40 字，不能使用中文。', type: 'danger' });
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -156,7 +158,7 @@ export default function LoginPage() {
       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username,email,phone,password})});
+        body: JSON.stringify({username: normalizedUsername,email,phone,password})});
 
       const data = await response.json();
       if (response.ok) {
@@ -326,7 +328,7 @@ export default function LoginPage() {
             <h1 style={{...mainTitleStyle, fontSize: '2rem', marginBottom: '20px'}}>REGISTER</h1>
 
             <div style={{...formGroupStyle, gap: '10px'}}>
-              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="姓名或使用者名稱" style={inputStyle}/></div>
+              <div style={inputWrapperStyle}><User size={12} style={iconStyle}/><input name="username" value={formData.username} onChange={handleChange} placeholder="帳號，例如 judy123 或 judy_lab" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Mail size={12} style={iconStyle}/><input name="email" value={formData.email} onChange={handleChange} placeholder="電子郵件" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Phone size={12} style={iconStyle}/><input name="phone" value={formData.phone} onChange={handleChange} placeholder="電話號碼" style={inputStyle}/></div>
               <div style={inputWrapperStyle}><Lock size={12} style={iconStyle}/><input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="至少 12 碼，含大小寫、數字、符號" style={inputStyle}/></div>
