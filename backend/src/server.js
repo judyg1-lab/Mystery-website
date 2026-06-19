@@ -110,8 +110,8 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
 app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Please choose an image file to upload' });
 
-  // Store a browser-readable URL for the uploaded avatar.
-    const avatarUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+  // Store a relative path so frontend can attach the correct API host.
+    const avatarUrl = `/uploads/${req.file.filename}`;
 
     try {
         await prisma.user.update({

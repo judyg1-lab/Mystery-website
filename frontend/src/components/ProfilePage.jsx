@@ -22,6 +22,12 @@ const getAssetUrl = (path = '') => {
   return `${API_BASE_URL}${path}`;
 };
 
+const getAvatarSrc = (path = '') => {
+  if (!path) return '';
+  if (/^(https?:|blob:|data:)/i.test(path)) return path;
+  return `${API_BASE_URL}${path}`;
+};
+
 const SYSTEM_COLORS = {
   'All': { color: '#ffffff', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
   'TAROT': { color: '#bc13fe', bg: 'rgba(188,19,254,0.12)', border: 'rgba(188,19,254,0.3)' },
@@ -115,6 +121,7 @@ export default function ProfilePage() {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const fileInputRef = React.useRef(null);
+  const avatarUploadSeqRef = useRef(0);
   const [exploreCount, setExploreCount] = useState(1);
   useEffect(() => {
     const savedCount = localStorage.getItem('mystic_explore_count');
@@ -216,10 +223,13 @@ export default function ProfilePage() {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const uploadSeq = avatarUploadSeqRef.current + 1;
+    avatarUploadSeqRef.current = uploadSeq;
 
     // 本地即時產生預覽線路，優化視覺體驗
     const previewURL = URL.createObjectURL(file);
     setAvatarUrl(previewURL);
+    e.target.value = '';
 
     // 封裝實體檔案二進位制數據
     const formData = new FormData();
@@ -238,6 +248,7 @@ export default function ProfilePage() {
       const data = await res.json();
 
       if (res.ok && data.avatarUrl) {
+        if (uploadSeq !== avatarUploadSeqRef.current) return;
         setAvatarUrl(data.avatarUrl);
         setUserInfo(prev => ({ ...prev, avatarUrl: data.avatarUrl }));
         const updatedUser = JSON.parse(localStorage.getItem('user_info') || '{}');
@@ -611,7 +622,7 @@ export default function ProfilePage() {
 
               <div style={styles.avatarCircle} onClick={handleAvatarClick}>
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}/>
+                  <img src={getAvatarSrc(avatarUrl)} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}/>
                 ) : (<User size={50} color="#bc13fe" />)}
                 <div style={styles.editAvatar}><Camera size={12} color="#fff" /></div>
               </div>
