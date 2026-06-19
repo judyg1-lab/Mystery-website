@@ -36,8 +36,6 @@ const avatarUpload = (req, res, next) => {
     });
 };
 
-const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'avatars';
-
 class AppError extends Error {
     constructor(message, status = 500, code = 'INTERNAL_ERROR') {
         super(message);
@@ -46,15 +44,17 @@ class AppError extends Error {
     }
 }
 
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'avatars';
+
 function getSupabaseStorageConfig() {
     const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
-        throw new AppError('Supabase Storage environment variables are not configured', 500, 'SUPABASE_STORAGE_CONFIG_MISSING');
+    if (!supabaseUrl || !secretKey) {
+        throw new AppError('Missing SUPABASE_URL or SUPABASE_SECRET_KEY', 500, 'SUPABASE_STORAGE_CONFIG_MISSING');
     }
 
-    return { supabaseUrl, serviceRoleKey };
+    return { supabaseUrl, secretKey };
 }
 
 function encodeStoragePath(storagePath) {
@@ -62,7 +62,7 @@ function encodeStoragePath(storagePath) {
 }
 
 async function uploadAvatarToSupabase(userId, file) {
-    const { supabaseUrl, serviceRoleKey } = getSupabaseStorageConfig();
+    const { supabaseUrl, secretKey } = getSupabaseStorageConfig();
     const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
     const safeExt = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
     const objectPath = `users/${userId}/avatar-${Date.now()}-${Math.round(Math.random() * 1E9)}${safeExt}`;
@@ -71,8 +71,8 @@ async function uploadAvatarToSupabase(userId, file) {
     try {
         await axios.post(uploadUrl, file.buffer, {
             headers: {
-                apikey: serviceRoleKey,
-                Authorization: `Bearer ${serviceRoleKey}`,
+                apikey: secretKey,
+                Authorization: `Bearer ${secretKey}`,
                 'Content-Type': file.mimetype || 'application/octet-stream',
                 'x-upsert': 'true'
             },
@@ -613,7 +613,7 @@ async function generateGeminiReading(prompt) {
         throw error;
     }
 
-    const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const response = await axios.post(url, {
         contents: [

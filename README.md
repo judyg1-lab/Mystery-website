@@ -190,11 +190,14 @@ DATABASE_URL="postgresql://..."
 JWT_SECRET="your-secret"
 PORT=5000
 GEMINI_API_KEY="your-gemini-api-key"
-GEMINI_MODEL="gemini-1.5-flash"
+GEMINI_MODEL="gemini-2.0-flash"
 AI_PROMPT_MAX_CHARS=4200
 AI_RATE_LIMIT_WINDOW_MS=3600000
 AI_RATE_LIMIT_MAX=12
 AI_MAX_OUTPUT_TOKENS=1200
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SECRET_KEY="your-supabase-secret-key"
+SUPABASE_STORAGE_BUCKET="avatars"
 ```
 
 Required:
@@ -206,10 +209,10 @@ Required only when AI reading is enabled:
 
 - `GEMINI_API_KEY`
 
-Required for avatar uploads:
+Required for permanent avatar uploads:
 
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY`
 - `SUPABASE_STORAGE_BUCKET`
 
 Frontend `.env` or Vercel environment variable:
@@ -324,14 +327,14 @@ DATABASE_URL="your-supabase-postgres-url"
 JWT_SECRET="your-secret"
 GEMINI_API_KEY="your-gemini-api-key"
 SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+SUPABASE_SECRET_KEY="your-supabase-secret-key"
 SUPABASE_STORAGE_BUCKET="avatars"
 ```
 
 Optional Render environment variables:
 
 ```env
-GEMINI_MODEL="gemini-1.5-flash"
+GEMINI_MODEL="gemini-2.0-flash"
 AI_PROMPT_MAX_CHARS=4200
 AI_RATE_LIMIT_WINDOW_MS=3600000
 AI_RATE_LIMIT_MAX=12
